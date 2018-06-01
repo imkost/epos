@@ -15,6 +15,12 @@ body {
   padding: 30px;
 }
 
+@media (max-width: 450px) {
+  .shop {
+    width: auto;
+  }
+}
+
 .tabs {
   display: flex;
   margin-bottom: 30px;

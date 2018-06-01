@@ -19,6 +19,12 @@ body {
   background: #fff;
 }
 
+@media (max-width: 250px) {
+  .shop {
+    width: auto;
+  }
+}
+
 /*!
  * New todo
  */
