@@ -9,11 +9,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.appendChild($app)
 })
 
-/*!
- * Store
- */
+var LS = {
+  set (key, value) {
+    localStorage.setItem(key, JSON.stringify(value))
+  },
 
-var store = Epos.object({
+  get (key) {
+    var value = localStorage.getItem(key)
+    return value ? JSON.parse(value) : null
+  }
+}
+
+var initialStore = LS.get('store') || {
   filter: 'all', // all/active/inactive
   todos: [
     {
@@ -22,13 +29,19 @@ var store = Epos.object({
       text: 'read a book'
     }
   ]
-})
+}
+
+/*!
+ * Store
+ */
+
+var store = Epos.object(initialStore)
 
 /*!
  * View
  */
 
-var view = Epos.view({
+var view = {
   class: () => [
     'todo-app',
     store.filter === 'active' ? ' todo-app-active' : '',
@@ -59,11 +72,18 @@ var view = Epos.view({
             todo.done ? ' todo-done' : ''
           ].join(''),
           inner: [
+            // Todo done mark
+            {
+              class: 'todo-done-mark',
+              onclick: `handlers.onTodoTextClick(${todo.id})`,
+              inner: '[done]'
+            },
             // Todo text
             {
               class: 'todo-text',
-              onclick: `handlers.onTodoTextClick(${todo.id})`,
-              inner: todo.text
+              tag: 'input',
+              oninput: `handlers.onTodoInput(event, ${todo.id})`,
+              value: todo.text
             },
             // Todo remove button
             {
@@ -101,7 +121,7 @@ var view = Epos.view({
       ]
     }
   ]
-})
+}
 
 /*!
  * Handlers
@@ -117,6 +137,7 @@ window.handlers = {
     }
   },
 
+  onTodoInput: (e, todoId) => acts.setTodoText(todoId, e.target.value),
   onTodoTextClick: (todoId) => acts.toggleTodo(todoId),
   onTodoRemoveClick: (todoId) => acts.removeTodo(todoId),
   onFilterClick: (filter) => acts.setFilter(filter)
@@ -135,6 +156,11 @@ var acts = {
     })
   },
 
+  setTodoText (todoId, text) {
+    var todo = store.todos.find(t => t.id === todoId)
+    todo.text = text
+  },
+
   toggleTodo (todoId) {
     var todo = store.todos.find(t => t.id === todoId)
     todo.done = !todo.done
@@ -150,14 +176,20 @@ var acts = {
   }
 }
 
+Object.keys(acts).forEach(key => {
+  var orig = acts[key]
+  acts[key] = (...args) => {
+    orig(...args)
+    LS.set('store', store)
+  }
+})
+
 /*!
  * Helpers
  */
 
 function generateId () {
-  var self = generateId
-  self.id || (self.id = 0)
-  return self.id++
+  return Math.round(Math.random() * 1000000)
 }
 
 })()

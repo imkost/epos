@@ -45,9 +45,20 @@ window.store = Epos.object({
  * View
  */
 
-window.view = Epos.view({
+window.view = {
   class: 'shop',
   inner: [
+    {
+      tag: 'input',
+      value: () => store.categories.find(c => c.id === store.curCategoryId).title,
+      oninput: 'handlers.onCategoryTitleInput(this)'
+    },
+    {
+      tag: 'input',
+      value: () => store.categories.find(c => c.id === store.curCategoryId).title,
+      oninput: 'handlers.onCategoryTitleInput(this)'
+    },
+
     // Tabs
     {
       class: 'tabs',
@@ -58,7 +69,7 @@ window.view = Epos.view({
             category.id === store.curCategoryId ? ' tab-active' : ''
           ].join(''),
           onclick: `handlers.onTabClick('${category.id}')`,
-          inner: category.title
+          inner: () => category.title
         }
       })
     },
@@ -111,7 +122,7 @@ window.view = Epos.view({
       })
     }
   ]
-})
+}
 
 /*!
  * Handlers
@@ -121,7 +132,12 @@ window.handlers = {
   onTabClick: (categoryId) => acts.setCurCategoryId(categoryId),
   onProductClick: (productId) => acts.addToCart(productId),
   onCartAddClick: (productId) => acts.addToCart(productId),
-  onCartRemoveClick: (productId) => acts.removeFromCart(productId)
+  onCartRemoveClick: (productId) => acts.removeFromCart(productId),
+
+  onCategoryTitleInput ($input) {
+    var curCategory = store.categories.find(c => c.id === store.curCategoryId)
+    curCategory.title = $input.value
+  }
 }
 
 /*!
