@@ -121,7 +121,7 @@ function update () {
   window._intervals = []
 
   var encoded = btoa(text)
-  setUrl(`/?js=${encoded}`)
+  setUrl(location.pathname + `?js=${encoded}`)
 
   var code = `
     ${text}
