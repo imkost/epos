@@ -69,7 +69,7 @@ var _view_ = {
               tag: 'pre',
               inner: '' +
                 '// Realtime results of\n' +
-                'var $app = Element.createElement(view)\n' +
+                'var $app = Epos.element(view)\n' +
                 'document.body.appendChild($app)'
             }
           ]
