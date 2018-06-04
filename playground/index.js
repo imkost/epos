@@ -1,13 +1,16 @@
 (() => {
 
 var initialCode = `var store = Epos.object({
-  counter: 0
+  count: 0
 })
 
 var view = {
   class: 'app',
+  style: 'display: flex',
   inner: [
-
+    { tag: 'button', inner: '+', onClick: () => store.count += 1 },
+    { tag: 'button', inner: '-', onClick: () => store.count -= 1 },
+    { inner: () => store.count, style: 'margin-left: 10px' }
   ]
 }
 `
@@ -47,10 +50,6 @@ function init () {
   })
 }
 
-
-var store = {
-
-}
 
 var _view_ = {
   class: 'App',
