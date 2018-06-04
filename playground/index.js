@@ -44,7 +44,7 @@ function init () {
       tabSize: 2
     })
     cm.on('change', () => {
-      setTimeout(update)
+      setTimeout(update, 10)
     })
     update()
   })
