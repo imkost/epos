@@ -67,7 +67,7 @@ var store = Epos.object({
  * View
  */
 
-var view = {
+var view = Epos.view({
   class: 'app',
   inner: [
     Tabs.render({
@@ -109,7 +109,7 @@ var view = {
       ]
     })
   ]
-}
+})
 
 /*!
  *
