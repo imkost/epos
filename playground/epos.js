@@ -158,7 +158,8 @@ window.Epos = {
   view: toView,
   stop,
   hooks: eposHooks,
-  fn: eposFn
+  fn: eposFn,
+  _clean: cleanAll
 }
 
 
@@ -551,6 +552,16 @@ function eposHooks (hooks) {
   return {
     [hooksSymbol]: hooks
   }
+}
+
+
+function cleanAll () {
+  nodes.forEach(node => {
+    node.deps.clear()
+    node.infls.clear()
+  })
+  nodes = []
+  nodesByProxy = new Map()
 }
 
 })()

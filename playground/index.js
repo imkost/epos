@@ -43,6 +43,8 @@ function init () {
       cursorBlinkRate: 0,
       tabSize: 2
     })
+
+    window.cm = cm
     var timer = null
     cm.on('change', () => {
       timer && clearTimeout(timer)
@@ -111,6 +113,8 @@ window.setInterval = (...args) => {
   window._intervals.push(id)
 }
 
+var listeners = []
+
 function update () {
   var text = cm.getValue()
 
@@ -124,18 +128,22 @@ function update () {
   var encoded = btoa(text)
   setUrl(location.pathname + `?js=${encoded}`)
 
+  Epos._clean()
+
   var code = `
-    ${text}
-    var $result = Epos.element(view)
-    var result = document.querySelector('.App__output')
-    result.innerHTML = ''
-    result.appendChild($result)
+    ;(function () {
+      ${text}
+      var $result = Epos.element(view)
+      var result = document.querySelector('.App__output')
+      result.innerHTML = ''
+      result.appendChild($result)
+    })()
   `
 
   try {
     eval(code)
   } catch (err) {
-    console.log(err);
+    // console.log(err);
   }
 }
 
