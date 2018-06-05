@@ -12,22 +12,41 @@ function isHook (key) {
   )
 }
 
-;['appendChild', 'insertBefore', 'insertAdjacentElement'].forEach((fnName, i) => {
+;['appendChild', 'insertBefore', 'insertAdjacentElement', 'removeChild'].forEach((fnName, i) => {
   var orig = HP[fnName]
   HP[fnName] = function (...args) {
+    if (i === 4) { // remove child
+      methods = ['beforeUnmount', 'afterUnmount']
+    } else {
+      methods = ['beforeMount', 'afterMount']
+    }
     if (i === 2) { // insertAdjacentElement
       elem = args[1]
     } else {
       elem = args[0]
     }
-
     var needHookExec = document.contains(this) && elem[isEposElem]
     if (needHookExec) {
-      callRecursive(elem, 'beforeMount')
+      callRecursive(elem, methods[0])
     }
     var result = orig.apply(this, args)
     if (needHookExec) {
-      callRecursive(elem, 'afterMount')
+      callRecursive(elem, methods[1])
+    }
+    return result
+  }
+})
+
+;['remove'].forEach(fnName => {
+  var orig = HP[fnName]
+  HP[fnName] = function (...args) {
+    var desc = document.contains(this) && this[isEposElem] ? this[eposDesc] : null
+    if (desc) {
+      desc.beforeUnmount && desc.beforeUnmount(this)
+    }
+    var result = orig.apply(this, args)
+    if (desc) {
+      desc.afterUnmount && desc.afterUnmount(this)
     }
     return result
   }
@@ -594,7 +613,9 @@ function isArray (any) {
 }
 
 function eposElementRoot (desc) {
-  desc = Epos.view(desc)
+  if (!desc[affectsView]) {
+    desc = Epos.view(desc)
+  }
   return eposCreateElement(desc)
 }
 
