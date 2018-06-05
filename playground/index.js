@@ -25,13 +25,6 @@ function init () {
   var $app = Epos.element(_view_)
   document.body.appendChild($app)
 
-  var origAppend = document.body.appendChild.bind(document.body)
-  var $output = document.querySelector('.App__output')
-
-  document.body.appendChild = (el) => {
-    $output.appendChild(el)
-  }
-
   requestAnimationFrame(() => {
     var elem = document.querySelector('.Editor')
 
@@ -91,7 +84,6 @@ function Editor (props = {}) {
   }
 }
 
-
 window._intervals = []
 
 var origSetInterval = setInterval
@@ -131,7 +123,7 @@ function update () {
   try {
     eval(code)
   } catch (err) {
-    var $result = Epos.element({ tag: 'pre', style: 'color: red', inner: err.toString() })
+    var $result = Epos.element({ style: 'color: red; font-family: monospace; line-height: 20px', inner: err.toString() })
     var result = document.querySelector('.App__output')
     result.innerHTML = ''
     result.appendChild($result)
