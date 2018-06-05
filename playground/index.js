@@ -43,8 +43,10 @@ function init () {
       cursorBlinkRate: 0,
       tabSize: 2
     })
+    var timer = null
     cm.on('change', () => {
-      setTimeout(update, 10)
+      timer && clearTimeout(timer)
+      timer = setTimeout(update, 10)
     })
     update()
   })
