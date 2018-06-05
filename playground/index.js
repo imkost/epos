@@ -143,6 +143,10 @@ function update () {
   try {
     eval(code)
   } catch (err) {
+    var $result = Epos.element({ tag: 'pre', inner: err.toString() })
+    var result = document.querySelector('.App__output')
+    result.innerHTML = ''
+    result.appendChild($result)
     // console.log(err);
   }
 }
