@@ -395,6 +395,8 @@ function setAttr (elem, key, value) {
 function createEposArray (arr, node) {
   var mapped = []
 
+  arr = toProxy(arr)
+
   class EposArray extends Array {
     map (iterator) {
       // maps become not reactive
