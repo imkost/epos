@@ -3,10 +3,6 @@
 var OP = Object.prototype
 var AP = Array.prototype
 
-var Wd = {
-  element
-}
-
 var RESERVED_KEYS = ['tag', 'inner']
 var EVENTS = [
   'abort', 'auxclick', 'beforecopy', 'beforecut', 'beforepaste', 'blur',
@@ -30,36 +26,31 @@ var EVENTS = [
  * desc = Object
  * => HTML
  */
-function element (desc) {
+function wdElement (desc) {
   if (Array.isArray(desc)) {
-    return toFlatArray(desc).map(element)
+    return toFlatArray(desc).map(wdElement)
   }
 
-  if (typeof desc === 'number') {
-    desc = desc.toString()
+  if (isStrOrNum(desc)) {
+    return document.createTextNode(desc.toString())
   }
-
-  if (typeof desc === 'string') {
-    return document.createTextNode(desc)
-  }
-
-  makeLinkIfHref(desc)
 
   var tag = getTag(desc)
-
   var elem = document.createElement(tag)
 
   for (var key in desc) {
+    var v = desc[key]
     if (isReservedKey(key)) {
       continue
     }
-    if (key.toLowerCase && EVENTS.includes(key.toLowerCase())) {
-      if (typeof desc[key] === 'function') {
-        elem.addEventListener(key.slice(2).toLowerCase(), desc[key])
-        continue
-      }
+    if (isEvent(key) && isFn(v)) {
+      elem.addEventListener(key.slice(2).toLowerCase(), v)
+      continue
     }
-    setAttr(elem, key, desc[key])
+    if (key === 'class') {
+      v = prepareClass(v)
+    }
+    setAttr(elem, key, v)
   }
 
   var children = getChildren(desc)
@@ -74,10 +65,8 @@ function alwaysArray (any) {
   return Array.isArray(any) ? any : [ any ]
 }
 
-function makeLinkIfHref (desc) {
-  if (isNonEmptyString(desc.href) && !desc.tag) {
-    desc.tag = 'a'
-  }
+function isFn (any) {
+  return typeof any === 'function'
 }
 
 function getTag (desc) {
@@ -87,8 +76,8 @@ function getTag (desc) {
     if (isString(tag) && /^[\w-]+$/.test(tag)) {
       return tag
     } else {
-      throw ''
       // throw 'Invalid tag name'
+      throw ''
     }
   }
 
@@ -97,7 +86,7 @@ function getTag (desc) {
 
 function getChildren (desc) {
   if ('inner' in desc) {
-    return toFlatArray(desc.inner).map(element)
+    return toFlatArray(desc.inner).map(wdElement)
   }
 
   return []
@@ -157,7 +146,6 @@ window.Epos = {
   object: toProxy,
   view: toView,
   stop,
-  hooks: eposHooks,
   fn: eposFn,
   _clean: cleanAll
 }
@@ -177,7 +165,9 @@ function toView (desc) {
   return toProxy(desc, true)
 }
 
-var proxies = []
+function isEvent (key) {
+  return key.toLowerCase && EVENTS.includes(key.toLowerCase())
+}
 
 function toProxy (desc, isView = false) {
   if (desc.inner) {
@@ -191,10 +181,9 @@ function toProxy (desc, isView = false) {
   }
 
   var proxy = new Proxy(desc, { get, set })
-  proxies.push(proxy)
 
   for (var key in desc) {
-    if (key.toLowerCase && EVENTS.includes(key.toLowerCase())) {
+    if (isEvent(key)) {
       continue
     }
 
@@ -219,7 +208,7 @@ function toProxy (desc, isView = false) {
   return proxy
 
   function get (d, key) {
-    if (key.toLowerCase && EVENTS.includes(key.toLowerCase())) {
+    if (isEvent(key)) {
       return desc[key]
     }
 
@@ -243,7 +232,7 @@ function toProxy (desc, isView = false) {
     if (!('value' in node)) {
       var value = desc[key]
 
-      if (typeof value === 'function' && !value[isEposFn]) {
+      if (isFn(value) && !value[isEposFn]) {
         calcNodes.push(node)
         value = value()
         calcNodes.pop()
@@ -281,35 +270,36 @@ function toProxy (desc, isView = false) {
 
     if (desc[key] === value) return
 
-    if (desc[affectsView]) {
-      var elem = window[desc.id]
-      if (!elem) return
-
-      if (key === 'tag') {
-        console.error('')
-      } else if (key === 'inner') {
-        if (typeof value === 'string' || typeof value === 'number') {
-          elem.innerText = value.toString()
-        } else if (isObject2(value)) {
-          value = toView(value)
-          elem.innerHTML = ''
-          elem.appendChild(Wd.element(value))
-        } else if (Array.isArray(value)) {
-          value = value.map(toView)
-          elem.innerHTML = ''
-          value.map(Wd.element).forEach(child => elem.appendChild(child))
-        }
-      } else if (key === 'value') {
-        elem.value = value
-      } else if (key === 'checked') {
-        elem.checked = value
-      } else {
-        if (typeof key === 'string') { // not symbol
-          setAttr(elem, key, value)
-        }
-      }
-    }
-
+    // if (desc[affectsView]) {
+    //   console.log('set of affectsView');
+    //   var elem = window[desc.id]
+    //   if (!elem) return
+    //   if (key === 'tag') {
+    //     console.error('')
+    //     // tag change not implemented
+    //   } else if (key === 'inner') {
+    //     if (isStrOrNum(value)) {
+    //       elem.innerText = value.toString()
+    //     } else if (isObject2(value)) {
+    //       value = toView(value)
+    //       elem.innerHTML = ''
+    //       elem.appendChild(wdElement(value))
+    //     } else if (Array.isArray(value)) {
+    //       value = value.map(toView)
+    //       elem.innerHTML = ''
+    //       value.map(wdElement).forEach(child => elem.appendChild(child))
+    //     }
+    //   } else if (key === 'value') {
+    //     elem.value = value
+    //   } else if (key === 'checked') {
+    //     elem.checked = value
+    //   } else if (isString(key)) { // not symbol
+    //     if (key === 'class') {
+    //       value = prepareClass(value)
+    //     }
+    //     setAttr(elem, key, value)
+    //   }
+    // }
 
     if (isObject2(value)) {
       value = toProxy(value, isView)
@@ -348,7 +338,6 @@ function toProxy (desc, isView = false) {
 }
 
 function recalculateNode (node) {
-  // console.log('recalculate', node.key)
   delete node.value
   node.proxy[node.key]
 
@@ -360,36 +349,42 @@ function recalculateNode (node) {
 
     var value = node.value
     if (key === 'tag') {
-      console.error()
       // console.log('tag change is not implemented')
     } else if (key === 'inner') {
-      if (typeof value === 'string' || typeof value === 'number') {
+      if (isStrOrNum(value)) {
         elem.innerText = value.toString()
       } else if (isObject(value)) { // not isObject2!!
         value = toView(value)
         elem.innerHTML = ''
-        elem.appendChild(Wd.element(value))
+        elem.appendChild(wdElement(value))
       } else if (Array.isArray(value)) {
         value = value.map(toView)
         elem.innerHTML = ''
-        value.map(Wd.element).forEach(child => elem.appendChild(child))
+        value.map(wdElement).forEach(child => elem.appendChild(child))
       }
     } else if (key === 'value') {
       elem.value = value
     } else if (key === 'checked') {
       elem.checked = value
-    } else {
+    } else if (isString(key)) {
+      if (key === 'class') {
+        value = prepareClass(value)
+      }
       setAttr(elem, key, value)
     }
   }
 }
 
 function setAttr (elem, key, value) {
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (isStrOrNum(value)) {
     elem.setAttribute(key, value)
   } else {
     elem.removeAttribute(key)
   }
+}
+
+function isStrOrNum (any) {
+  return isString(any) || typeof any === 'number'
 }
 
 function createEposArray (arr, node) {
@@ -430,9 +425,9 @@ function createEposArray (arr, node) {
             var parent = window[n.desc.id]
             if (method === 'push') {
               console.log('add elem');
-              parent.appendChild(Wd.element(v))
+              parent.appendChild(wdElement(v))
             } else {
-              parent.insertAdjacentElement('afterbegin', Wd.element(v))
+              parent.insertAdjacentElement('afterbegin', wdElement(v))
             }
           }
         }
@@ -544,18 +539,9 @@ function isArray (any) {
 
 function createElement (desc) {
   return desc[affectsView]
-    ? Wd.element(desc)
-    : Wd.element(Epos.view(desc))
+    ? wdElement(desc)
+    : wdElement(Epos.view(desc))
 }
-
-var hooksSymbol = Symbol('eposHooks')
-
-function eposHooks (hooks) {
-  return {
-    [hooksSymbol]: hooks
-  }
-}
-
 
 function cleanAll () {
   nodes.forEach(node => {

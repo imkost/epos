@@ -17,8 +17,7 @@ var view = {
 
 var Epos = window.Epos
 var CodeMirror = window.CodeMirror
-var cm
-var css
+var cm = null
 
 document.addEventListener('DOMContentLoaded', init)
 
@@ -26,12 +25,18 @@ function init () {
   var $app = Epos.element(_view_)
   document.body.appendChild($app)
 
+  var origAppend = document.body.appendChild.bind(document.body)
+  var $output = document.querySelector('.App__output')
+
+  document.body.appendChild = (el) => {
+    $output.appendChild(el)
+  }
+
   requestAnimationFrame(() => {
     var elem = document.querySelector('.Editor')
-    var codeFromUrl
 
     try {
-      codeFromUrl = atob(location.search.split('?js=')[1])
+      var codeFromUrl = atob(location.search.split('?js=')[1])
     } catch (err) {}
 
     cm = CodeMirror(elem, {
@@ -63,25 +68,8 @@ var _view_ = {
       inner: Editor({ code: initialCode })
     },
     {
-      class: 'App__right',
-      inner: [
-        {
-          class: 'App__info',
-          inner: [
-            {
-              tag: 'pre',
-              inner: '' +
-                '// Realtime results of\n' +
-                'var $app = Epos.element(view)\n' +
-                'document.body.appendChild($app)'
-            }
-          ]
-        },
-        {
-          class: 'App__output',
-          inner: ''
-        }
-      ]
+      class: 'App__output',
+      inner: ''
     }
   ]
 }
@@ -132,22 +120,21 @@ function update () {
 
   var code = `
     ;(function () {
-      ${text}
-      var $result = Epos.element(view)
-      var result = document.querySelector('.App__output')
-      result.innerHTML = ''
-      result.appendChild($result)
+      var __result__ = document.querySelector('.App__output')
+      __result__.innerHTML = ''
+      ${text.split('document.body').join('__result__')}
+      // var $result = Epos.element(view)
+      // __result__.appendChild($result)
     })()
   `
 
   try {
     eval(code)
   } catch (err) {
-    var $result = Epos.element({ tag: 'pre', inner: err.toString() })
+    var $result = Epos.element({ tag: 'pre', style: 'color: red', inner: err.toString() })
     var result = document.querySelector('.App__output')
     result.innerHTML = ''
     result.appendChild($result)
-    // console.log(err);
   }
 }
 
