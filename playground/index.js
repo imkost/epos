@@ -1,11 +1,7 @@
 (() => {
 
-var initialCode = `requestAnimationFrame(() => {
-  var $app = Epos.element(view)
-  document.body.appendChild($app)
-})
-
-var store = Epos.object({
+var initialCode = '' +
+`var store = Epos.object({
   count: 0
 })
 
@@ -19,7 +15,7 @@ var view = {
     },
     {
       tag: 'button',
-      inner: '-'
+      inner: '-',
       onClick: () => store.count -= 1
     },
     {
@@ -27,6 +23,9 @@ var view = {
     }
   ]
 }
+
+var $app = Epos.element(view)
+document.body.appendChild($app)
 `
 
 var Epos = window.Epos
