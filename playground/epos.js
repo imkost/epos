@@ -1,63 +1,33 @@
 (() => {
 
-var HP = HTMLElement.prototype
-var oAppendChild = HP.appendChild
+var mo = new MutationObserver(mutations => {
+  mutations.forEach(mutation => {
+    Array.from(mutation.addedNodes).forEach(elem => {
+      callRecursive(elem, 'onMounted')
+    })
+
+    Array.from(mutation.removedNodes).forEach(elem => {
+      callRecursive(elem, 'onUnmounted')
+    })
+  })
+})
+
+mo.observe(document, { childList: true, subtree: true })
 
 function isHook (key) {
   return (
-    key === 'beforeMount' ||
-    key === 'afterMount' ||
-    key === 'beforeUnmount' ||
-    key === 'afterUnmount'
+    key === 'onMounted' ||
+    key === 'onUnmounted'
   )
 }
 
-;['appendChild', 'insertBefore', 'insertAdjacentElement', 'removeChild'].forEach((fnName, i) => {
-  var orig = HP[fnName]
-  HP[fnName] = function (...args) {
-    if (i === 4) { // remove child
-      methods = ['beforeUnmount', 'afterUnmount']
-    } else {
-      methods = ['beforeMount', 'afterMount']
-    }
-    if (i === 2) { // insertAdjacentElement
-      elem = args[1]
-    } else {
-      elem = args[0]
-    }
-    var needHookExec = document.contains(this) && elem[isEposElem]
-    if (needHookExec) {
-      callRecursive(elem, methods[0])
-    }
-    var result = orig.apply(this, args)
-    if (needHookExec) {
-      callRecursive(elem, methods[1])
-    }
-    return result
-  }
-})
-
-;['remove'].forEach(fnName => {
-  var orig = HP[fnName]
-  HP[fnName] = function (...args) {
-    var desc = document.contains(this) && this[isEposElem] ? this[eposDesc] : null
-    if (desc) {
-      desc.beforeUnmount && desc.beforeUnmount(this)
-    }
-    var result = orig.apply(this, args)
-    if (desc) {
-      desc.afterUnmount && desc.afterUnmount(this)
-    }
-    return result
-  }
-})
 
 function callRecursive (elem, method) {
-  var desc = elem[eposDesc]
+  var desc = elem[isEposElem] ? elem[eposDesc] : null
   if (desc) {
     desc[method] && desc[method](elem)
-    Array.from(elem.children).forEach(c => callRecursive(c, method))
   }
+  Array.from(elem.children || []).forEach(c => callRecursive(c, method))
 }
 
 var OP = Object.prototype
@@ -417,11 +387,11 @@ function recalculateNode (node) {
         elem.innerText = value.toString()
       } else if (isObject(value)) { // not isObject2!!
         value = toView(value)
-        unmountChildren(elem)
+        elem.innerHTML = ''
         elem.appendChild(eposCreateElement(value))
       } else if (isArray(value)) {
         value = value.map(toView)
-        unmountChildren(elem)
+        elem.innerHTML = ''
         value.map(eposCreateElement).forEach(child => elem.appendChild(child))
       }
 
@@ -438,13 +408,6 @@ function recalculateNode (node) {
       setAttr(elem, key, value)
     }
   }
-}
-
-function unmountChildren (elem) {
-  var children = Array.from(elem.children)
-  children.forEach(c => callRecursive(c, 'beforeUnmount'))
-  elem.innerHTML = ''
-  children.forEach(c => callRecursive(c, 'afterUnmount'))
 }
 
 function setAttr (elem, key, value) {
