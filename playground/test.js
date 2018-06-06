@@ -1,3 +1,31 @@
+
+var store = Epos.object({
+  big: true,
+  title: '[big inner call]'
+})
+
+var view = {
+  class: 'app',
+  inner: () => store.big
+    ? {
+      class: 'big',
+      inner: {
+        class: 'title',
+        inner: () => {
+          console.log('title update')
+          return store.title
+        }
+      }
+    }
+    : { class: 'small', inner: 'small' }
+}
+
+var $app = Epos.element(view)
+document.body.appendChild($app)
+window.store = store
+
+/*
+
 var store = Epos.object({
   rows: generateRows()
 })
@@ -31,7 +59,7 @@ function start () {
 }
 
 function frame () {
-  Array.from(new Array(5000)).forEach(() => {
+  Array.from(new Array(3000)).forEach(() => {
     var i = Math.round(Math.random() * 49)
     store.rows[i].title = String(Math.round(Math.random() * 10000))
     // children[i].innerText = String(Math.round(Math.random() * 10000))
@@ -44,3 +72,6 @@ function frame () {
     console.log(ops)
   }
 }
+
+
+*/

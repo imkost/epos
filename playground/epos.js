@@ -193,15 +193,17 @@ function flatten (array) {
   return flat
 }
 
+var proxies = new Set()
 
 window.Epos = {
   element: eposElementRoot,
   object: toProxy,
-  view: toView,
   raw: rawHtml,
   stop,
   fn: eposFn,
-  _clean: cleanAll
+  _view: toView,
+  _clean: cleanAll,
+  _proxies: proxies
 }
 
 
@@ -229,7 +231,11 @@ function isEvent (key) {
   return isString(key) && EVENTS.includes(key.toLowerCase())
 }
 
-function toProxy (desc, isView = false) {
+function toProxy (desc, isView = false, parentProxy = null) {
+  if (desc && desc.__isProxy) {
+    return desc
+  }
+
   if (desc.inner) {
     isView = true
   }
@@ -241,6 +247,7 @@ function toProxy (desc, isView = false) {
   }
 
   var proxy = new Proxy(desc, { get, set })
+  proxies.add(proxy)
 
   for (var k in desc) {
     processKey(k)
@@ -260,7 +267,7 @@ function toProxy (desc, isView = false) {
     var node = createNode(proxy, desc, key)
 
     if (isObjectNotProxy(desc[key])) {
-      desc[key] = toProxy(desc[key], isView)
+      desc[key] = toProxy(desc[key], isView, proxy)
     }
 
     processArrayIfArrayRecursive(desc, key, node, isView)
@@ -277,7 +284,7 @@ function toProxy (desc, isView = false) {
       for (var i = 0; i < valueLength; i++) {
         var v = value[i]
         if (isObjectNotProxy(v)) {
-          value[i] = toProxy(v, isView)
+          value[i] = toProxy(v, isView, proxy)
         }
         processArrayIfArrayRecursive(value, i, node, isView)
       }
@@ -315,14 +322,14 @@ function toProxy (desc, isView = false) {
         calcNodes.pop()
 
         if (isObjectNotProxy(value)) {
-          value = toProxy(value, isView)
+          value = toProxy(value, isView, proxy)
         }
         if (isArray(value)) {
           var valueLength = value.length;
           for (var i = 0; i < valueLength; i++) {
             var v = value[i]
             if (isObjectNotProxy(v)) {
-              value[i] = toProxy(v, isView)
+              value[i] = toProxy(v, isView, proxy)
             }
           }
         }
@@ -352,7 +359,7 @@ function toProxy (desc, isView = false) {
     }
 
     if (isObjectNotProxy(value)) {
-      value = toProxy(value, isView)
+      value = toProxy(value, isView, proxy)
     }
 
     if (!(key in desc)) {
@@ -395,9 +402,42 @@ function toProxy (desc, isView = false) {
   }
 }
 
+function dropProxyDeep (proxy, key) {
+  var node = getNode(proxy, key)
+
+  var infls = Array.from(node.infls)
+  var deps = Array.from(node.deps)
+  node.infls.clear()
+  node.deps.clear()
+  for (var dep of deps) {
+    dep.infls.delete(node)
+  }
+  for (var infl of infls) {
+    infl.deps.delete(node)
+  }
+
+  proxies.delete(proxy)
+  for (var k in node.desc) {
+    var v = node.desc[k]
+    if (v && v.__isProxy) {
+      dropProxyDeep(v, key)
+    }
+  }
+  // Object.keys(node.desc).forEach(k => {
+  // })
+}
+
 function recalculateNode (node) {
+  var prevChildProxy = node.value && node.value.__isProxy ? node.value : null
+
   delete node.value
   node.proxy[node.key]
+
+  // var nextChildProxy = node.value && node.value.__isProxy ? node.value : null
+
+  if (prevChildProxy) {
+    dropProxyDeep(prevChildProxy, node.key)
+  }
 
   if (node.desc[affectsView]) {
     var desc = node.desc
@@ -479,14 +519,14 @@ function createEposArray (arr, node) {
 
     _pushUnshift (item, method) {
       if (isObjectNotProxy(item)) {
-        item = toProxy(item)
+        item = toProxy(item, null, node.proxy)
       }
 
       for (var it of mapped) {
         var { m, iterator, node: n } = it
         var v = iterator(item, m.length)
         if (isObjectNotProxy(v)) {
-          v = toProxy(v)
+          v = toProxy(v, null, node.proxy)
         }
 
         m[method](v)
@@ -612,7 +652,7 @@ function isArray (any) {
 
 function eposElementRoot (desc) {
   if (!desc[affectsView]) {
-    desc = Epos.view(desc)
+    desc = toView(desc)
   }
   return eposCreateElement(desc)
 }
