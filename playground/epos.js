@@ -1,15 +1,21 @@
 (() => {
 
 var mo = new MutationObserver(mutations => {
-  mutations.forEach(mutation => {
-    Array.from(mutation.addedNodes).forEach(elem => {
+  for (var mutation of mutations) {
+    for (var elem of mutation.addedNodes) {
       callRecursive(elem, 'onMounted')
-    })
+    }
 
-    Array.from(mutation.removedNodes).forEach(elem => {
+    for (var elem of mutation.removedNodes) {
       callRecursive(elem, 'onUnmounted')
-    })
-  })
+
+      if (elem[listenersKey]) {
+        for (var listener of elem[listenersKey]) {
+          elem.removeEventListener(listener.name, listener.handler)
+        }
+      }
+    }
+  }
 })
 
 mo.observe(document, { childList: true, subtree: true })
@@ -21,19 +27,23 @@ function isHook (key) {
   )
 }
 
-
 function callRecursive (elem, method) {
   var desc = elem[isEposElem] ? elem[eposDesc] : null
   if (desc) {
     desc[method] && desc[method](elem)
   }
-  Array.from(elem.children || []).forEach(c => callRecursive(c, method))
+  if (elem.children && elem.children.length) {
+    for (var c of elem.children) {
+      callRecursive(c, method)
+    }
+  }
 }
 
 var OP = Object.prototype
 var AP = Array.prototype
 var isEposElem = Symbol('isEposElem')
 var eposDesc = Symbol('eposDesc')
+var listenersKey = Symbol('listeners')
 
 var RESERVED_KEYS = ['tag', 'inner']
 var EVENTS = [
@@ -88,17 +98,19 @@ function wdElement (desc) {
     if (isReservedKey(key) || isHook(key)) {
       continue
     }
-    if (isEvent(key) && isFn(v)) {
+    if (isFn(v) && isEvent(key)) {
       elem.addEventListener(key.slice(2).toLowerCase(), v)
+      elem[listenersKey] || (elem[listenersKey] = [])
+      elem[listenersKey].push({ name: key.slice(2).toLowerCase(), handler: v })
       continue
     }
     setAttr(elem, key, v)
   }
 
   var children = getChildren(desc)
-  children.forEach(child => {
+  for (var child of children) {
     child && elem.appendChild(child)
-  })
+  }
 
   elem[isEposElem] = true
   return elem
@@ -170,13 +182,13 @@ function toFlatArray (any) {
 function flatten (array) {
   var flat = []
 
-  array.forEach(item => {
+  for (var item of array) {
     if (isArray(item)) {
       flat = flat.concat(flatten(item))
     } else {
       flat.push(item)
     }
-  })
+  }
 
   return flat
 }
@@ -214,7 +226,7 @@ function toView (desc) {
 }
 
 function isEvent (key) {
-  return key.toLowerCase && EVENTS.includes(key.toLowerCase())
+  return isString(key) && EVENTS.includes(key.toLowerCase())
 }
 
 function toProxy (desc, isView = false) {
@@ -240,13 +252,14 @@ function toProxy (desc, isView = false) {
     if (isHook(key)) {
       return
     }
+
     if (isEvent(key)) {
       return
     }
 
     var node = createNode(proxy, desc, key)
 
-    if (isObject2(desc[key])) {
+    if (isObjectNotProxy(desc[key])) {
       desc[key] = toProxy(desc[key], isView)
     }
 
@@ -259,12 +272,15 @@ function toProxy (desc, isView = false) {
     if (isArray(value)) {
       obj[key] = createEposArray(value, node)
       value = obj[key]
-      value.forEach((v, i) => {
-        if (isObject2(v)) {
+      var valueLength = value.length
+
+      for (var i = 0; i < valueLength; i++) {
+        var v = value[i]
+        if (isObjectNotProxy(v)) {
           value[i] = toProxy(v, isView)
         }
         processArrayIfArrayRecursive(value, i, node, isView)
-      })
+      }
     }
   }
 
@@ -298,15 +314,17 @@ function toProxy (desc, isView = false) {
         value = value()
         calcNodes.pop()
 
-        if (isObject2(value)) {
+        if (isObjectNotProxy(value)) {
           value = toProxy(value, isView)
         }
         if (isArray(value)) {
-          value.forEach((v, i) => {
-            if (isObject2(v)) {
+          var valueLength = value.length;
+          for (var i = 0; i < valueLength; i++) {
+            var v = value[i]
+            if (isObjectNotProxy(v)) {
               value[i] = toProxy(v, isView)
             }
-          })
+          }
         }
       }
 
@@ -333,7 +351,7 @@ function toProxy (desc, isView = false) {
       return
     }
 
-    if (isObject2(value)) {
+    if (isObjectNotProxy(value)) {
       value = toProxy(value, isView)
     }
 
@@ -354,21 +372,26 @@ function toProxy (desc, isView = false) {
     node.infls.clear()
     node.deps.clear()
 
-    recalculateNode(node)
+    // is it optimization?
+    if (deps.length) {
+      recalculateNode(node)
+    } else {
+      node.value = value
+    }
 
     // Update deps
-    deps.forEach(dep => {
+    for (var dep of deps) {
       dep.infls.delete(node)
-    })
+    }
 
     // Update infls
-    infls.forEach(infl => {
+    for (var infl of infls) {
       infl.deps.clear()
 
       // Update value
       recalculateNode(infl)
       updateInflsDeep(infl)
-    })
+    }
   }
 }
 
@@ -395,22 +418,24 @@ function recalculateNode (node) {
     } else if (key === 'inner') {
       if (isStrOrNum(value)) {
         elem.innerText = value.toString()
-      } else if (isObject(value)) { // not isObject2!!
+      } else if (isObject(value)) { // not isObjectNotProxy!!
         value = toView(value)
         elem.innerHTML = ''
         elem.appendChild(eposCreateElement(value))
       } else if (isArray(value)) {
         value = value.map(toView)
         elem.innerHTML = ''
-        value.map(eposCreateElement).forEach(child => elem.appendChild(child))
+        for (var child of value.map(eposCreateElement)) {
+          elem.appendChild(child)
+        }
       }
 
     // Value
-    } else if (key === 'value') {
+    } else if (key === 'value' && elem.tagName === 'INPUT') {
       elem.value = value
 
     // Checked
-    } else if (key === 'checked') {
+    } else if (key === 'checked' && elem.tagName === 'INPUT') {
       elem.checked = value
 
     // Attr
@@ -439,8 +464,6 @@ function isStrOrNum (any) {
 function createEposArray (arr, node) {
   var mapped = []
 
-  // arr = toProxy(arr)
-
   class EposArray extends Array {
     map (iterator) {
       // maps become not reactive
@@ -455,13 +478,14 @@ function createEposArray (arr, node) {
     }
 
     _pushUnshift (item, method) {
-      if (isObject2(item)) {
+      if (isObjectNotProxy(item)) {
         item = toProxy(item)
       }
 
-      mapped.forEach(({ m, iterator, node: n }) => {
+      for (var it of mapped) {
+        var { m, iterator, node: n } = it
         var v = iterator(item, m.length)
-        if (isObject2(v)) {
+        if (isObjectNotProxy(v)) {
           v = toProxy(v)
         }
 
@@ -479,7 +503,7 @@ function createEposArray (arr, node) {
             }
           }
         }
-      })
+      }
 
       AP[method].call(this, item)
     }
@@ -511,15 +535,16 @@ function createEposArray (arr, node) {
 
     splice (index, i) {
       AP.splice.call(this, index, i)
-      mapped.forEach(({ m }) => {
-        Array.from(Array(i)).forEach((_, j) => {
+      for (var it of mapped) {
+        var { m } = it
+        for (var j = 0; j < i; j++) {
           var elem = window[m[index + j].id]
           if (elem) {
             elem.outerHTML = ''
           }
-        })
+        }
         m.splice(index, i)
-      })
+      }
     }
 
     getNode () {
@@ -532,11 +557,11 @@ function createEposArray (arr, node) {
 }
 
 function updateInflsDeep(node) {
-  node.infls.forEach(infl => {
+  for (var infl of node.infls) {
     infl.deps.clear()
     recalculateNode(infl)
     updateInflsDeep(infl)
-  })
+  }
 }
 
 var nodes = []
@@ -577,8 +602,8 @@ function stop (fn) {
   return v
 }
 
-function isObject2 (any) {
-  return isObject(any) && !any.__isProxy && OP.toString.call(any) === '[object Object]'
+function isObjectNotProxy (any) {
+  return isObject(any) && !any.__isProxy
 }
 
 function isArray (any) {
@@ -599,10 +624,10 @@ function eposCreateElement (desc) {
 }
 
 function cleanAll () {
-  nodes.forEach(node => {
+  for (var node of nodes) {
     node.deps.clear()
     node.infls.clear()
-  })
+  }
   nodes = []
   nodesByProxy = new Map()
 }

@@ -128,8 +128,6 @@ function update () {
       var __result__ = document.querySelector('.App__output')
       __result__.innerHTML = ''
       ${text.split('document.body').join('__result__')}
-      // var $result = Epos.element(view)
-      // __result__.appendChild($result)
     })()
   `
 
