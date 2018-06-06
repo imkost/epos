@@ -234,6 +234,8 @@ function toProxy (desc, isView = false) {
     processKey(k)
   }
 
+  return proxy
+
   function processKey (key) {
     if (isHook(key)) {
       return
@@ -248,19 +250,23 @@ function toProxy (desc, isView = false) {
       desc[key] = toProxy(desc[key], isView)
     }
 
-    if (isArray(desc[key])) {
-      desc[key] = createEposArray(desc[key], node)
-      desc[key].forEach((v, i) => {
-        if (isObject2(v)) {
-          desc[key][i] = toProxy(v, isView)
-        }
-      })
-    }
-
+    processArrayIfArrayRecursive(desc, key, node, isView)
     proxy[key]
   }
 
-  return proxy
+  function processArrayIfArrayRecursive (obj, key, node, isView) {
+    var value = obj[key]
+    if (isArray(value)) {
+      obj[key] = createEposArray(value, node)
+      value = obj[key]
+      value.forEach((v, i) => {
+        if (isObject2(v)) {
+          value[i] = toProxy(v, isView)
+        }
+        processArrayIfArrayRecursive(value, i, node, isView)
+      })
+    }
+  }
 
   function get (d, key) {
     if (isEvent(key)) {
