@@ -230,12 +230,16 @@ function toProxy (desc, isView = false) {
 
   var proxy = new Proxy(desc, { get, set })
 
-  for (var key in desc) {
+  for (var k in desc) {
+    processKey(k)
+  }
+
+  function processKey (key) {
     if (isHook(key)) {
-      continue
+      return
     }
     if (isEvent(key)) {
-      continue
+      return
     }
 
     var node = createNode(proxy, desc, key)
@@ -429,7 +433,7 @@ function isStrOrNum (any) {
 function createEposArray (arr, node) {
   var mapped = []
 
-  arr = toProxy(arr)
+  // arr = toProxy(arr)
 
   class EposArray extends Array {
     map (iterator) {
