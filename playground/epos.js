@@ -71,7 +71,8 @@ var EVENTS = [
 function wdElement (desc) {
   var elem
 
-  if (desc instanceof HTMLElement) {
+  var nodeType = desc && desc.nodeType
+  if (nodeType === Node.TEXT_NODE || nodeType === Node.ELEMENT_NODE) {
     desc[isEposElem] = true
     return desc
   }
@@ -215,7 +216,7 @@ var isEposFn = Symbol('isEposFn')
 function rawHtml (str) {
   var div = document.createElement('div')
   div.innerHTML = str
-  return Array.from(div.children)
+  return Array.from(div.childNodes)
 }
 
 function eposFn (fn) {
@@ -325,7 +326,7 @@ function toProxy (desc, isView = false) {
           value = toProxy(value, isView)
         }
         if (isArray(value)) {
-          var valueLength = value.length;
+          var valueLength = value.length
           for (var i = 0; i < valueLength; i++) {
             var v = value[i]
             if (isObjectNotProxy(v)) {
