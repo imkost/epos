@@ -1,4 +1,3 @@
-
 var store = Epos.object({
   big: true,
   title: '[big inner call]'
