@@ -6,7 +6,8 @@ window.Epos = {
   fn: eposFn,
   rawHtml: rawHtml,
   scope: eposStop,
-  scoped: eposScoped
+  scoped: eposScoped,
+  _clean: cleanAll
 }
 
 var proxies = new Set()
@@ -797,6 +798,15 @@ function eposScoped (fn) {
   return function scoped (...args) {
     return eposStop(() => fn(...args))
   }
+}
+
+function cleanAll () {
+  for (var node of nodes) {
+    node.deps.clear()
+    node.infls.clear()
+  }
+  nodes = []
+  nodesByProxy = new Map()
 }
 
 })()
