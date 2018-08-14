@@ -6,6 +6,7 @@ window.Epos = {
   fn: eposFn,
   rawHtml: rawHtml,
   scope: eposStop,
+  scoped: eposScoped,
   _clean: cleanAll
 }
 
@@ -19,6 +20,21 @@ var isEposElem = Symbol('isEposElem')
 var eposDesc = Symbol('eposDesc')
 var listenersKey = Symbol('listeners')
 var isEposArray = Symbol('isEposArray')
+
+// Object.assign(Mdl.require('/common/lib/Epos'), {
+//   _view: toView,
+//   _clean: cleanAll,
+//   _proxies: proxies
+// })
+
+window.logs = {}
+
+function log (key) {
+  var v = logs[key] || (logs[key] = 0)
+  logs[key] = v + 1
+  // var value = Number(localStorage.getItem(key)) || 0
+  // localStorage.setItem(key, value + 1)
+}
 
 // TODO: instead of iterating all added/removed elements check only epos-registered
 // onMount/onUnmount elements and try to find them in childlists of added/removed
@@ -43,6 +59,7 @@ var mo = new MutationObserver(mutations => {
 mo.observe(document, { childList: true, subtree: true })
 
 function isHook (key) {
+  log('isHook')
   return (
     key === 'onMounted' ||
     key === 'onUnmounted'
@@ -50,6 +67,7 @@ function isHook (key) {
 }
 
 function processMounUnmountRecursive (elem, method) {
+  log('processMounUnmountRecursive')
   var desc = elem[isEposElem] ? elem[eposDesc] : null
   if (desc) {
     desc[method] && desc[method](elem)
@@ -89,6 +107,7 @@ var EVENTS = [
  * => HTML
  */
 function wdElement (desc) {
+  log('wdElement')
   var elem
 
   var nodeType = desc && desc.nodeType
@@ -140,14 +159,17 @@ function wdElement (desc) {
 }
 
 function alwaysArray (any) {
+  log('alwaysArray')
   return isArray(any) ? any : [ any ]
 }
 
 function isFn (any) {
+  log('isFn')
   return typeof any === 'function'
 }
 
 function getTag (desc) {
+  log('getTag')
   if ('tag' in desc) {
     var tag = desc.tag
 
@@ -167,6 +189,7 @@ function getTag (desc) {
 }
 
 function getChildren (desc) {
+  log('getChildren')
   if ('inner' in desc) {
     return toFlatArray(desc.inner).map(eposCreateElement)
   }
@@ -175,6 +198,7 @@ function getChildren (desc) {
 }
 
 function prepareClass (attrValue) {
+  log('prepareClass')
   return toFlatArray(attrValue)
     .filter(isNonEmptyString)
     .join(' ')
@@ -183,22 +207,27 @@ function prepareClass (attrValue) {
 }
 
 function isReservedKey (key) {
+  log('isReservedKey')
   return RESERVED_KEYS.includes(key)
 }
 
 function isString (any) {
+  log('isString')
   return typeof any === 'string'
 }
 
 function isObject (any) {
+  log('isObject')
   return OP.toString.call(any) === '[object Object]'
 }
 
 function isNonEmptyString (any) {
+  log('isNonEmptyString')
   return isString(any) && any
 }
 
 function toFlatArray (any) {
+  log('toFlatArray')
   if (isArray(any)) {
     return flatten(any)
   }
@@ -207,6 +236,7 @@ function toFlatArray (any) {
 }
 
 function flatten (array) {
+  log('flatten')
   var flat = []
 
   for (var item of array) {
@@ -226,6 +256,7 @@ var affectsView = Symbol('affectsView')
 var isEposFn = Symbol('isEposFn')
 
 function rawHtml (str) {
+  log('rawHtml')
   var div = document.createElement('div')
   div.innerHTML = str
   return Array.from(div.childNodes)
@@ -236,6 +267,7 @@ function eposFn (fn) {
     return () => {}
   }
 
+  log('eposFn')
   if (fn) {
     fn[isEposFn] = true
   }
@@ -244,16 +276,19 @@ function eposFn (fn) {
 }
 
 function toView (desc) {
+  log('toView')
   return toProxy(desc, true)
 }
 
 function isEvent (key) {
+  log('isEvent')
   return isString(key) && EVENTS.includes(key.toLowerCase())
 }
 
 window.gg = 0
 
 function toProxy (desc, isView = false) {
+  log('toProxy')
 
   /**
    * Situation:
@@ -292,6 +327,7 @@ function toProxy (desc, isView = false) {
   return proxy
 
   function processKey (key) {
+    log('processKey')
     if (isHook(key)) {
       return
     }
@@ -311,6 +347,7 @@ function toProxy (desc, isView = false) {
   }
 
   function processArrayIfArrayRecursive (obj, key, node, isView) {
+    log('processArrayIfArrayRecursive')
     var value = obj[key]
 
     if (isArray(value)) {
@@ -333,6 +370,7 @@ function toProxy (desc, isView = false) {
       return true
     }
 
+    log('get')
     if (key === 'o') {
       return JSON.parse(JSON.stringify(d))
     }
@@ -437,13 +475,17 @@ function toProxy (desc, isView = false) {
       infl.deps.clear()
 
       // Update value
+      var prevValue = infl.value
       recalculateNode(infl)
-      updateInflsDeep(infl)
+      if (prevValue !== infl.value) {
+        updateInflsDeep(infl)
+      }
     }
   }
 }
 
 function dropProxyDeep (proxy, key) {
+  log('dropProxyDeep')
   var node = getNode(proxy, key)
 
   var infls = Array.from(node.infls)
@@ -467,6 +509,7 @@ function dropProxyDeep (proxy, key) {
 }
 
 function recalculateNode (node) {
+  log('recalculateNode')
   var prevChildProxy = node.value && node.value.__isProxy ? node.value : null
 
   var prevValue = node.value
@@ -529,6 +572,7 @@ function recalculateNode (node) {
 }
 
 function setAttr (elem, key, value) {
+  log('setAttr')
   if (key === 'class') {
     value = prepareClass(value)
   }
@@ -544,123 +588,121 @@ function setAttr (elem, key, value) {
 }
 
 function isStrOrNum (any) {
+  log('isStrOrNum')
   return isString(any) || typeof any === 'number'
 }
 
 function createEposArray (arr, node) {
+  log('createEposArray')
   if (arr[isEposArray]) {
     return arr
   }
 
   var mapped = []
 
-  class EposArray extends Array {}
-  function map (iterator) {
-    // maps become not reactive
-    var origIterator = iterator
-    iterator = (item, i) => eposStop(() => origIterator(item, i))
+  class EposArray extends Array {
+    map (iterator) {
+      // maps become not reactive
+      var origIterator = iterator
+      iterator = (item, i) => eposStop(() => origIterator(item, i))
 
-    var m = new Array(...AP.map.call(this, iterator))
-    var calcNode = calcNodes[calcNodes.length - 1]
-    var r = createEposArray(m, calcNode)
-    mapped.push({ m: r, iterator, node: calcNode })
-    return r
-  }
-
-  function _pushUnshift (item, method) {
-    if (isObjectNotProxy(item)) {
-      item = toProxy(item, null)
+      var m = new Array(...AP.map.call(this, iterator))
+      var calcNode = calcNodes[calcNodes.length - 1]
+      var r = createEposArray(m, calcNode)
+      mapped.push({ m: r, iterator, node: calcNode })
+      return r
     }
 
-    for (var it of mapped) {
-      var { m, iterator, node: n } = it
-      var v = iterator(item, m.length)
-      if (isObjectNotProxy(v)) {
-        v = toProxy(v, null)
+    _pushUnshift (item, method) {
+      if (isObjectNotProxy(item)) {
+        item = toProxy(item, null)
       }
 
-      m[method](v)
+      for (var it of mapped) {
+        var { m, iterator, node: n } = it
+        var v = iterator(item, m.length)
+        if (isObjectNotProxy(v)) {
+          v = toProxy(v, null)
+        }
 
-      if (v && v.__desc && v.__desc[affectsView]) {
-        var desc = v.__desc
-        var n = m.getNode()
-        if (n && n.desc && elemsById[n.desc[__id__]]) {
-          var parent = elemsById[n.desc[__id__]]
-          if (method === 'push') {
-            parent.insertAdjacentElement('beforeend', eposCreateElement(v))
-          } else {
-            parent.insertAdjacentElement('afterbegin', eposCreateElement(v))
+        m[method](v)
+
+        if (v && v.__desc && v.__desc[affectsView]) {
+          var desc = v.__desc
+          var n = m.getNode()
+          if (n && n.desc && elemsById[n.desc[__id__]]) {
+            var parent = elemsById[n.desc[__id__]]
+            if (method === 'push') {
+              parent.insertAdjacentElement('beforeend', eposCreateElement(v))
+            } else {
+              parent.insertAdjacentElement('afterbegin', eposCreateElement(v))
+            }
           }
         }
       }
+
+      AP[method].call(this, item)
     }
 
-    AP[method].call(this, item)
-  }
-
-  function unshift (item) {
-    this._pushUnshift(item, 'unshift')
-  }
-
-  function push (item) {
-    this._pushUnshift(item, 'push')
-  }
-
-  function pop () {
-    if (this.length) {
-      var v = this[this.length - 1]
-      this.splice(this.length - 1, 1)
-      return v
+    unshift (item) {
+      this._pushUnshift(item, 'unshift')
     }
-  }
 
-  // remove first
-  function shift () {
-    if (this.length) {
-      var v = this[0]
-      this.splice(0, 1)
-      return v
+    push (item) {
+      this._pushUnshift(item, 'push')
     }
-  }
 
-  function splice (index, i) {
-    AP.splice.call(this, index, i)
-    for (var it of mapped) {
-      var { m } = it
-      for (var j = 0; j < i; j++) {
-        var elem = elemsById[m[index + j][__id__]]
-        if (elem) {
-          elem.outerHTML = ''
-        }
+    pop () {
+      if (this.length) {
+        var v = this[this.length - 1]
+        this.splice(this.length - 1, 1)
+        return v
       }
-      m.splice(index, i)
+    }
+
+    // remove first
+    shift () {
+      if (this.length) {
+        var v = this[0]
+        this.splice(0, 1)
+        return v
+      }
+    }
+
+    splice (index, i) {
+      AP.splice.call(this, index, i)
+      for (var it of mapped) {
+        var { m } = it
+        for (var j = 0; j < i; j++) {
+          var elem = elemsById[m[index + j][__id__]]
+          if (elem) {
+            elem.outerHTML = ''
+          }
+        }
+        m.splice(index, i)
+      }
+    }
+
+    getNode () {
+      return node
     }
   }
 
-  function getNode () {
-    return node
-  }
-
-  var customArr = Object.assign(new Array(...arr), {
-    map,
-    _pushUnshift,
-    unshift,
-    push,
-    pop,
-    shift,
-    splice,
-    getNode,
-    [isEposArray]: true
-  })
-
+  var customArr = new EposArray(...arr)
+  customArr[isEposArray] = true
   return customArr
 }
 
 function updateInflsDeep(node) {
+  log('updateInflsDeep')
   for (var infl of node.infls) {
     infl.deps.clear()
+
+    var prevValue = infl.value
     recalculateNode(infl)
-    updateInflsDeep(infl)
+    if (prevValue !== infl.value) {
+      updateInflsDeep(infl)
+    }
   }
 }
 
@@ -669,6 +711,7 @@ var nodesByProxy = new Map()
 window.nodes = nodes
 
 function createNode (proxy, desc, key) {
+  log('createNode')
   var self = createNode
   var node = {
     id: self.nodeId || (self.nodeId = 0),
@@ -686,12 +729,14 @@ function createNode (proxy, desc, key) {
 }
 
 function getNode (proxy, key) {
+  log('getNode')
   return nodesByProxy.get(proxy)
     ? nodesByProxy.get(proxy)[key]
     : null
 }
 
 function eposStop (fn) {
+  log('eposStop')
   var calcNode = calcNodes[calcNodes.length - 1]
   if (calcNode && !calcNode.freeze) {
     calcNode.freeze = true
@@ -704,14 +749,17 @@ function eposStop (fn) {
 }
 
 function isObjectNotProxy (any) {
+  log('isObjectNotProxy')
   return isObject(any) && !any.__isProxy
 }
 
 function isArray (any) {
+  log('isArray')
   return Array.isArray(any)
 }
 
 function eposElementRoot (desc) {
+  log('eposElementRoot')
   if (!desc[affectsView]) {
     desc = toView(desc)
   }
@@ -720,12 +768,29 @@ function eposElementRoot (desc) {
 }
 
 function eposCreateElement (desc) {
+  log('eposCreateElement')
   if (!desc && desc !== 0) {
     return null
   }
   var elem = wdElement(desc)
   elem[eposDesc] = desc
   return elem
+}
+
+function cleanAll () {
+  log('cleanAll')
+  for (var node of nodes) {
+    node.deps.clear()
+    node.infls.clear()
+  }
+  nodes = []
+  nodesByProxy = new Map()
+}
+
+function eposScoped (fn) {
+  return function scoped (...args) {
+    return eposStop(() => fn(...args))
+  }
 }
 
 function cleanAll () {
