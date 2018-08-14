@@ -6,8 +6,7 @@ window.Epos = {
   fn: eposFn,
   rawHtml: rawHtml,
   scope: eposStop,
-  scoped: eposScoped,
-  _clean: cleanAll
+  scoped: eposScoped
 }
 
 var proxies = new Set()
@@ -259,7 +258,9 @@ function rawHtml (str) {
   log('rawHtml')
   var div = document.createElement('div')
   div.innerHTML = str
-  return Array.from(div.childNodes)
+  var divsArray = Array.from(div.childNodes)
+  divsArray.__isEposDivsArray = true
+  return divsArray
 }
 
 function eposFn (fn) {
@@ -547,10 +548,15 @@ function recalculateNode (node) {
         elem.innerHTML = ''
         elem.appendChild(eposCreateElement(value))
       } else if (isArray(value)) {
-        value = value.map(toView)
-        elem.innerHTML = ''
-        for (var child of value.map(eposCreateElement)) {
-          elem.appendChild(child)
+        if (value.__isEposDivsArray) {
+          elem.innerHTML = ''
+          value.forEach(v => elem.appendChild(v))
+        } else {
+          value = value.map(toView)
+          elem.innerHTML = ''
+          for (var child of value.map(eposCreateElement)) {
+            elem.appendChild(child)
+          }
         }
       } else if (!value) {
         elem.innerHTML = ''
@@ -791,15 +797,6 @@ function eposScoped (fn) {
   return function scoped (...args) {
     return eposStop(() => fn(...args))
   }
-}
-
-function cleanAll () {
-  for (var node of nodes) {
-    node.deps.clear()
-    node.infls.clear()
-  }
-  nodes = []
-  nodesByProxy = new Map()
 }
 
 })()
