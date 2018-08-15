@@ -7,6 +7,7 @@ window.Epos = {
   rawHtml: rawHtml,
   scope: eposStop,
   scoped: eposScoped,
+  transaction: eposTransaction,
   _clean: cleanAll
 }
 
@@ -20,6 +21,8 @@ var isEposElem = Symbol('isEposElem')
 var eposDesc = Symbol('eposDesc')
 var listenersKey = Symbol('listeners')
 var isEposArray = Symbol('isEposArray')
+var transactionLevel = 0
+var transactionNodes = []
 
 // Object.assign(Mdl.require('/common/lib/Epos'), {
 //   _view: toView,
@@ -512,6 +515,12 @@ function dropProxyDeep (proxy, key) {
 
 function recalculateNode (node) {
   log('recalculateNode')
+
+  if (transactionLevel > 0) {
+    transactionNodes.push(node)
+    return
+  }
+
   var prevChildProxy = node.value && node.value.__isProxy ? node.value : null
 
   var prevValue = node.value
@@ -807,6 +816,14 @@ function cleanAll () {
   }
   nodes = []
   nodesByProxy = new Map()
+}
+
+function eposTransaction(fn) {
+  transactionLevel += 1
+  fn()
+  transactionNodes.forEach(recalculateNode)
+  transactionNodes = []
+  transactionLevel -= 1
 }
 
 })()
