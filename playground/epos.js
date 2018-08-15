@@ -621,95 +621,129 @@ function createEposArray (arr, node) {
 
   var mapped = []
 
-  class EposArray extends Array {
-    map (iterator) {
-      // maps become not reactive
-      var origIterator = iterator
-      iterator = (item, i) => eposStop(() => origIterator(item, i))
+  function map (iterator) {
+    // maps become not reactive
+    var origIterator = iterator
+    iterator = (item, i) => eposStop(() => origIterator(item, i))
 
-      var m = new Array(...AP.map.call(this, iterator))
-      var calcNode = calcNodes[calcNodes.length - 1]
-      var r = createEposArray(m, calcNode)
-      mapped.push({ m: r, iterator, node: calcNode })
-      return r
+    var m = new Array(...AP.map.call(this, iterator))
+    var calcNode = calcNodes[calcNodes.length - 1]
+    var r = createEposArray(m, calcNode)
+    mapped.push({ m: r, iterator, node: calcNode })
+    return r
+  }
+
+  function _pushUnshift (item, method) {
+    if (transactionLevel > 0) {
+      transactionNodes.push({
+        calc: () => this._pushUnshift(item, method)
+      })
+      return
     }
 
-    _pushUnshift (item, method) {
-      if (isObjectNotProxy(item)) {
-        item = toProxy(item, null)
+    if (isObjectNotProxy(item)) {
+      item = toProxy(item, null)
+    }
+
+    for (var it of mapped) {
+      var { m, iterator, node: n } = it
+      var v = iterator(item, m.length)
+      if (isObjectNotProxy(v)) {
+        v = toProxy(v, null)
       }
 
-      for (var it of mapped) {
-        var { m, iterator, node: n } = it
-        var v = iterator(item, m.length)
-        if (isObjectNotProxy(v)) {
-          v = toProxy(v, null)
-        }
+      m[method](v)
 
-        m[method](v)
-
-        if (v && v.__desc && v.__desc[affectsView]) {
-          var desc = v.__desc
-          var n = m.getNode()
-          if (n && n.desc && elemsById[n.desc[__id__]]) {
-            var parent = elemsById[n.desc[__id__]]
-            if (method === 'push') {
-              parent.insertAdjacentElement('beforeend', eposCreateElement(v))
-            } else {
-              parent.insertAdjacentElement('afterbegin', eposCreateElement(v))
-            }
+      if (v && v.__desc && v.__desc[affectsView]) {
+        var desc = v.__desc
+        var n = m.getNode()
+        if (n && n.desc && elemsById[n.desc[__id__]]) {
+          var parent = elemsById[n.desc[__id__]]
+          if (method === 'push') {
+            parent.insertAdjacentElement('beforeend', eposCreateElement(v))
+          } else {
+            parent.insertAdjacentElement('afterbegin', eposCreateElement(v))
           }
         }
       }
-
-      AP[method].call(this, item)
     }
 
-    unshift (item) {
-      this._pushUnshift(item, 'unshift')
+    AP[method].call(this, item)
+  }
+
+  function unshift (item) {
+    this._pushUnshift(item, 'unshift')
+  }
+
+  function push (item) {
+    this._pushUnshift(item, 'push')
+  }
+
+  function pop () {
+    if (transactionLevel > 0) {
+      transactionNodes.push({
+        calc: () => this.pop()
+      })
+      return
     }
 
-    push (item) {
-      this._pushUnshift(item, 'push')
-    }
-
-    pop () {
-      if (this.length) {
-        var v = this[this.length - 1]
-        this.splice(this.length - 1, 1)
-        return v
-      }
-    }
-
-    // remove first
-    shift () {
-      if (this.length) {
-        var v = this[0]
-        this.splice(0, 1)
-        return v
-      }
-    }
-
-    splice (index, i) {
-      AP.splice.call(this, index, i)
-      for (var it of mapped) {
-        var { m } = it
-        for (var j = 0; j < i; j++) {
-          var elem = elemsById[m[index + j][__id__]]
-          if (elem) {
-            elem.outerHTML = ''
-          }
-        }
-        m.splice(index, i)
-      }
-    }
-
-    getNode () {
-      return node
+    if (this.length) {
+      var v = this[this.length - 1]
+      this.splice(this.length - 1, 1)
+      return v
     }
   }
 
-  var customArr = new EposArray(...arr)
+  // remove first
+  function shift () {
+    if (transactionLevel > 0) {
+      transactionNodes.push({
+        calc: () => this.shift()
+      })
+      return
+    }
+
+    if (this.length) {
+      var v = this[0]
+      this.splice(0, 1)
+      return v
+    }
+  }
+
+  function splice (index, i) {
+    if (transactionLevel > 0) {
+      transactionNodes.push({
+        calc: () => this.splice(index, i)
+      })
+      return
+    }
+
+    AP.splice.call(this, index, i)
+    for (var it of mapped) {
+      var { m } = it
+      for (var j = 0; j < i; j++) {
+        var elem = elemsById[m[index + j][__id__]]
+        if (elem) {
+          elem.outerHTML = ''
+        }
+      }
+      m.splice(index, i)
+    }
+  }
+
+  function getNode () {
+    return node
+  }
+
+  var customArr = new Array(...arr)
+  customArr._pushUnshift = _pushUnshift
+  customArr.map = map
+  customArr.unshift = unshift
+  customArr.push = push
+  customArr.pop = pop
+  customArr.shift = shift
+  customArr.splice = splice
+  customArr.getNode = getNode
   customArr[isEposArray] = true
   return customArr
 }
@@ -817,7 +851,16 @@ function eposTransaction(fn) {
   transactionLevel += 1
   fn()
   transactionLevel -= 1
-  transactionNodes.forEach(updateNodeDeepOnSet)
+
+  transactionNodes.forEach(node => {
+    // For array items
+    if (node.calc) {
+      node.calc()
+    } else {
+      updateNodeDeepOnSet(node)
+    }
+  })
+
   transactionNodes = []
 }
 
