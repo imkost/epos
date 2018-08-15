@@ -163,7 +163,7 @@ function wdElement (desc) {
 
 function alwaysArray (any) {
   log('alwaysArray')
-  return isArray(any) ? any : [ any ]
+  return isArray(any) ? any : [any]
 }
 
 function isFn (any) {
@@ -235,7 +235,7 @@ function toFlatArray (any) {
     return flatten(any)
   }
 
-  return [ any ]
+  return [any]
 }
 
 function flatten (array) {
@@ -457,34 +457,45 @@ function toProxy (desc, isView = false) {
       return
     }
 
-    // Recalculate cache
-    var infls = Array.from(node.infls)
-    var deps = Array.from(node.deps)
-    node.infls.clear()
-    node.deps.clear()
+    updateNodeDeepOnSet(node)
+  }
+}
 
-    // is it optimization?
-    if (deps.length) {
-      recalculateNode(node)
-    } else {
-      node.value = value
-    }
+function updateNodeDeepOnSet (node) {
+  if (transactionLevel > 0) {
+    transactionNodes.push(node)
+    return
+  }
 
-    // Update deps
-    for (var dep of deps) {
-      dep.infls.delete(node)
-    }
+  // Recalculate cache
+  var infls = Array.from(node.infls)
+  var deps = Array.from(node.deps)
+  node.infls.clear()
+  node.deps.clear()
 
-    // Update infls
-    for (var infl of infls) {
-      infl.deps.clear()
+  recalculateNode(node)
 
-      // Update value
-      var prevValue = infl.value
-      recalculateNode(infl)
-      if (prevValue !== infl.value) {
-        updateInflsDeep(infl)
-      }
+  // Is it optimization?
+  // if (deps.length) {
+  //   recalculateNode(node)
+  // } else {
+  //   node.value = value
+  // }
+
+  // Update deps
+  for (var dep of deps) {
+    dep.infls.delete(node)
+  }
+
+  // Update infls
+  for (var infl of infls) {
+    infl.deps.clear()
+
+    // Update value
+    var prevValue = infl.value
+    recalculateNode(infl)
+    if (prevValue !== infl.value) {
+      updateInflsDeep(infl)
     }
   }
 }
@@ -515,12 +526,6 @@ function dropProxyDeep (proxy, key) {
 
 function recalculateNode (node) {
   log('recalculateNode')
-
-  if (transactionLevel > 0) {
-    transactionNodes.push(node)
-    return
-  }
-
   var prevChildProxy = node.value && node.value.__isProxy ? node.value : null
 
   var prevValue = node.value
@@ -724,7 +729,7 @@ function updateInflsDeep(node) {
 
 var nodes = []
 var nodesByProxy = new Map()
-window.nodes = nodes
+// window.nodes = nodes
 
 function createNode (proxy, desc, key) {
   log('createNode')
@@ -779,7 +784,6 @@ function eposElementRoot (desc) {
   if (!desc[affectsView]) {
     desc = toView(desc)
   }
-  window.d = desc
   return eposCreateElement(desc)
 }
 
@@ -809,6 +813,14 @@ function eposScoped (fn) {
   }
 }
 
+function eposTransaction(fn) {
+  transactionLevel += 1
+  fn()
+  transactionLevel -= 1
+  transactionNodes.forEach(updateNodeDeepOnSet)
+  transactionNodes = []
+}
+
 function cleanAll () {
   for (var node of nodes) {
     node.deps.clear()
@@ -816,14 +828,6 @@ function cleanAll () {
   }
   nodes = []
   nodesByProxy = new Map()
-}
-
-function eposTransaction(fn) {
-  transactionLevel += 1
-  fn()
-  transactionNodes.forEach(recalculateNode)
-  transactionNodes = []
-  transactionLevel -= 1
 }
 
 })()
