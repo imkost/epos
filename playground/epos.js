@@ -828,6 +828,8 @@ function cleanAll () {
   }
   nodes = []
   nodesByProxy = new Map()
+  transactionNodes = []
+  transactionLevel = 0
 }
 
 function eposScoped (fn) {
