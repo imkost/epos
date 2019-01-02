@@ -302,8 +302,8 @@ function render (template) {
 
   if (template && template[_isStream_]) {
     const stream = template
-    // const startNode = document.createTextNode('[s]')
-    // const endNode = document.createTextNode('[e]')
+    // const startNode = document.createTextNode('')
+    // const endNode = document.createTextNode('')
     // startNode[_isStartNode_] = true
     // endNode[_isEndNode_] = true
     // startNode[_nodeId_] = globalNodeId
@@ -449,8 +449,8 @@ function render (template) {
   }
 
   if (isArray(template)) {
-    const startNode = document.createTextNode('[s]')
-    const endNode = document.createTextNode('[e]')
+    const startNode = document.createTextNode('')
+    const endNode = document.createTextNode('')
     startNode[_isStartNode_] = true
     endNode[_isEndNode_] = true
     startNode[_nodeId_] = globalNodeId
@@ -465,8 +465,8 @@ function render (template) {
   }
 
   if (isFunction(template)) {
-    const startNode = document.createTextNode('[s]')
-    const endNode = document.createTextNode('[e]')
+    const startNode = document.createTextNode('')
+    const endNode = document.createTextNode('')
     startNode[_isStartNode_] = true
     endNode[_isEndNode_] = true
     startNode[_nodeId_] = globalNodeId
@@ -487,6 +487,11 @@ function render (template) {
           fragment.appendChild(newNode)
         }
 
+        if (!startNode.nextSibling) {
+          console.log('WHY?');
+          return
+        }
+
         while (startNode.nextSibling !== endNode) {
           startNode.nextSibling.remove()
         }
@@ -495,14 +500,11 @@ function render (template) {
       }
     })
 
-    const fnArray = [
+    return [
       startNode,
       ...nodes,
       endNode
     ]
-
-    fnArray._isStreamArray = true
-    return fnArray
   }
 
   let node

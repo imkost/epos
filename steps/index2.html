@@ -63,7 +63,7 @@
             }
           },
 
-          { // TODO: fix this case
+          {
             inner: store.items.map$(char => {
               return [
                 {
@@ -71,9 +71,19 @@
                   inner: char.toUpperCase()
                 },
                 store.numbers.map$(number => {
-                  return {
-                    inner () {
-                      return number.v$
+                  return () => {
+                    if (store.show$) {
+                      return [
+                        {
+                          inner: store.items.map$(char => {
+                            return char.toUpperCase() + '-'
+                          })
+                        }
+                      ]
+                    }
+
+                    return {
+                      inner: 'not shown'
                     }
                   }
                 })
