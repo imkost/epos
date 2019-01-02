@@ -181,7 +181,10 @@ function createStream (array, fn) {
  *
  ******************************************************************************/
 
+let autorunsCount = 0
+
 function createAutorun (fn) {
+  autorunsCount += 1
   let deps = []
   const autorun = {
     stop,
@@ -197,8 +200,7 @@ function createAutorun (fn) {
   return autorun
 
   function run () {
-    stop()
-
+    stop(false)
     const parentGet = curGet
     const parentAutorun = curAutorun
     curGet = get
@@ -213,7 +215,10 @@ function createAutorun (fn) {
     deps.push(change)
   }
 
-  function stop () {
+  function stop (isDestroy = true) {
+    if (isDestroy) {
+      autorunsCount -= 1
+    }
     for (const child of autorun.children) {
       child.stop()
     }
@@ -392,60 +397,23 @@ function render (template) {
             cursor = cursor.nextSibling
             if (i === index) {
               for (const node of nodes) {
-                node.remove()
+                removeNode(node)
               }
             }
             i += 1
           } else {
             if (i === index) {
-              cursor.remove()
+              removeNode(cursor)
               break
             }
             cursor = cursor.nextSibling
             i += 1
           }
         }
-
-
-
-        // while (true) {
-        //   if (cursor[_isStartNode_]) {
-        //     if (i === index) {
-        //       nodesToRemove.push(cursor)
-        //     }
-        //     while (!cursor[_isEndNode_]) {
-        //       cursor = cursor.nextSibling
-        //       if (i === index) {
-        //         nodesToRemove.push(cursor)
-        //       }
-        //     }
-        //   } else {
-        //     if (i === index) {
-        //       nodesToRemove.push(cursor)
-        //     }
-        //   }
-
-        //   if (i === index) {
-        //     break
-        //   }
-
-        //   cursor = cursor.nextSibling
-        //   i += 1
-        // }
-
-        // for (const node of nodesToRemove) {
-        //   node.remove()
-        // }
       }
     })
 
     return nodes
-
-    // return [
-    //   startNode,
-    //   ...nodes,
-    //   endNode
-    // ]
   }
 
   if (isArray(template)) {
@@ -475,7 +443,7 @@ function render (template) {
     let nodes
 
     let isFirstRun = true
-    createAutorun(() => {
+    let a = createAutorun(() => {
       const newNodes = toFlatArray(render(template()))
 
       if (isFirstRun) {
@@ -487,18 +455,20 @@ function render (template) {
           fragment.appendChild(newNode)
         }
 
-        if (!startNode.nextSibling) {
-          console.log('WHY?');
+        if (!startNode.parentNode) {
+          a.stop()
           return
         }
 
         while (startNode.nextSibling !== endNode) {
-          startNode.nextSibling.remove()
+          removeNode(startNode.nextSibling)
         }
 
         endNode.parentNode.insertBefore(fragment, endNode)
       }
     })
+
+    startNode._autorun = a
 
     return [
       startNode,
@@ -636,6 +606,13 @@ function callFns (fns, ...args) {
       fn(...args)
     }
   }
+}
+
+function removeNode (node) {
+  if (node._autorun) {
+    node._autorun.stop()
+  }
+  node.remove()
 }
 
 /*******************************************************************************
