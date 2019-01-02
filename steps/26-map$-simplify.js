@@ -301,12 +301,12 @@ function render (template) {
   }
 
   if (template && template[_isStream_]) {
-    const array = template
+    const stream = template
     const startNode = document.createTextNode('')
     const endNode = document.createTextNode('')
-    const nodes = render(array.slice())
+    const nodes = render(stream.slice())
 
-    watchStream(array, {
+    watchStream(stream, {
       onAdd (index, item) {
         const newNodes = toFlatArray(render(item))
         let cursor = startNode.nextSibling

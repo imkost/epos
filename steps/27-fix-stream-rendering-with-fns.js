@@ -21,7 +21,8 @@ const _change_ = Symbol('change')
 const _itemAdd_ = Symbol('itemAdd')
 const _itemRemove_ = Symbol('itemRemove')
 const _isEventHandler_ = Symbol('isEventHandler')
-const _isDivider_ = Symbol('isDivider')
+const _isStartNode_ = Symbol('isStartNode')
+const _isEndNode_ = Symbol('isEndNode')
 const _isStream_ = Symbol('isStream')
 
 /*******************************************************************************
@@ -155,14 +156,10 @@ function createSource (initial, parentChange) {
  ******************************************************************************/
 
 function createStream (array, fn) {
-  if (!fn) {
-    fn = (i) => i
-  }
-
   const stream = createSource(array.map(fn))
   stream[_isStream_] = true
 
-  watchStream(array, {
+  watchArray(array, {
     onAdd (index, item) {
       stream.splice$(index, 0, createSource(fn(item)))
     },
@@ -301,37 +298,73 @@ function render (template) {
   }
 
   if (template && template[_isStream_]) {
-    const array = template
-    const startNode = document.createTextNode('')
-    const endNode = document.createTextNode('')
-    const nodes = render(array.slice())
+    const stream = template
+    const startNode = document.createTextNode('[s]')
+    const endNode = document.createTextNode('[e]')
+    startNode[_isStartNode_] = true
+    endNode[_isEndNode_] = true
+    const nodes = render(stream.slice())
 
-    watchStream(array, {
+    watchArray(stream, {
       onAdd (index, item) {
         const newNodes = toFlatArray(render(item))
         let cursor = startNode.nextSibling
-        let i = 1
-        while (i <= index) {
-          cursor = cursor.nextSibling
-          if (!cursor[_isDivider_]) {
-            i += 1
+        let i = 0
+
+        while (true) {
+          if (cursor[_isStartNode_]) {
+            while (!cursor[_isEndNode_]) {
+              cursor = cursor.nextSibling
+            }
           }
+
+          cursor = cursor.nextSibling
+
+          if (i === index + 1) {
+            break
+          }
+
+          i += 1
         }
+
         for (const newNode of newNodes) {
           cursor.parentNode.insertBefore(newNode, cursor)
         }
       },
 
       onRemove (index) {
+        const nodesToRemove = []
+        let i = 0
         let cursor = startNode.nextSibling
-        let i = 1
-        while (i <= index) {
-          cursor = cursor.nextSibling
-          if (!cursor[_isDivider_]) {
-            i += 1
+
+        while (true) {
+          if (cursor[_isStartNode_]) {
+            if (i === index) {
+              nodesToRemove.push(cursor)
+            }
+            while (!cursor[_isEndNode_]) {
+              cursor = cursor.nextSibling
+              if (i === index) {
+                nodesToRemove.push(cursor)
+              }
+            }
+          } else {
+            if (i === index) {
+              nodesToRemove.push(cursor)
+            }
           }
+
+          if (i === index) {
+            break
+          }
+
+          cursor = cursor.nextSibling
+          i += 1
         }
-        cursor.remove()
+
+        for (const node of nodesToRemove) {
+          node.remove()
+        }
       }
     })
 
@@ -343,14 +376,23 @@ function render (template) {
   }
 
   if (isArray(template)) {
-    return toFlatArray(template.map(render))
+    const startNode = document.createTextNode('[s]')
+    const endNode = document.createTextNode('[e]')
+    startNode[_isStartNode_] = true
+    endNode[_isEndNode_] = true
+
+    return [
+      startNode,
+      ...toFlatArray(template.map(render)),
+      endNode
+    ]
   }
 
   if (isFunction(template)) {
-    const startNode = document.createTextNode('')
-    const endNode = document.createTextNode('')
-    startNode[_isDivider_] = true
-    endNode[_isDivider_] = true
+    const startNode = document.createTextNode('[s]')
+    const endNode = document.createTextNode('[e]')
+    startNode[_isStartNode_] = true
+    endNode[_isEndNode_] = true
     let nodes
 
     let isFirstRun = true
@@ -482,7 +524,7 @@ function addRenderPlugin (plugin) {
  *
  ******************************************************************************/
 
-function watchStream (array, { onAdd, onRemove }) {
+function watchArray (array, { onAdd, onRemove }) {
   if (array[_itemAdd_]) {
     array[_itemAdd_].add(onAdd)
     array[_itemRemove_].add(onRemove)

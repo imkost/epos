@@ -1,6 +1,7 @@
-window.Epos = {
+export {
   // Reactivity
   createSource,
+  createStream,
   createAutorun,
   createStandaloneAutorun,
   getComputed,
@@ -8,6 +9,7 @@ window.Epos = {
 
   // Rendering
   render,
+  renderStream,
   createEventHandler,
   addRenderPlugin
 }
@@ -21,8 +23,6 @@ const _change_ = Symbol('change')
 const _itemAdd_ = Symbol('itemAdd')
 const _itemRemove_ = Symbol('itemRemove')
 const _isEventHandler_ = Symbol('isEventHandler')
-const _isDivider_ = Symbol('isDivider')
-const _isStream_ = Symbol('isStream')
 
 /*******************************************************************************
  *
@@ -82,47 +82,33 @@ function createSource (initial, parentChange) {
 
     const methods = {
       pop () {
-        const lastIndex = source.length - 1
-        const lastItem = source[lastIndex]
-        remove(lastIndex)
-        return lastItem
+        remove(source.length - 1)
       },
       push (item) {
         add(source.length, item)
-        return source.length
       },
       shift () {
-        const firstItem = source[0]
         remove(0)
-        return firstItem
       },
       unshift (item) {
         add(0, item)
-        return source.length
       },
       splice (start, removeCount, ...items) {
-        const removedItems = []
-
         for (let i = 0; i < removeCount; i++) {
-          removedItems.push(source[start])
           remove(start)
         }
-
         for (let i = 0; i < items.length; i++) {
           add(Math.min(start + i, source.length), items[i])
         }
-
-        return removedItems
       }
     }
 
     for (const name in methods) {
       const method = (...args) => {
-        const result = methods[name](...args)
+        methods[name](...args)
         if (parentChange) {
           callFns(parentChange)
         }
-        return result
       }
 
       Object.defineProperty(source, `${name}$`, {
@@ -131,16 +117,6 @@ function createSource (initial, parentChange) {
         }
       })
     }
-
-    const map$ = (fn) => {
-      return createStream(source, fn)
-    }
-
-    Object.defineProperty(source, 'map$', {
-      get () {
-        return map$
-      }
-    })
 
     return source
   }
@@ -160,7 +136,6 @@ function createStream (array, fn) {
   }
 
   const stream = createSource(array.map(fn))
-  stream[_isStream_] = true
 
   watchStream(array, {
     onAdd (index, item) {
@@ -300,48 +275,6 @@ function render (template) {
     return template
   }
 
-  if (template && template[_isStream_]) {
-    const array = template
-    const startNode = document.createTextNode('')
-    const endNode = document.createTextNode('')
-    const nodes = render(array.slice())
-
-    watchStream(array, {
-      onAdd (index, item) {
-        const newNodes = toFlatArray(render(item))
-        let cursor = startNode.nextSibling
-        let i = 1
-        while (i <= index) {
-          cursor = cursor.nextSibling
-          if (!cursor[_isDivider_]) {
-            i += 1
-          }
-        }
-        for (const newNode of newNodes) {
-          cursor.parentNode.insertBefore(newNode, cursor)
-        }
-      },
-
-      onRemove (index) {
-        let cursor = startNode.nextSibling
-        let i = 1
-        while (i <= index) {
-          cursor = cursor.nextSibling
-          if (!cursor[_isDivider_]) {
-            i += 1
-          }
-        }
-        cursor.remove()
-      }
-    })
-
-    return [
-      startNode,
-      ...nodes,
-      endNode
-    ]
-  }
-
   if (isArray(template)) {
     return toFlatArray(template.map(render))
   }
@@ -349,8 +282,6 @@ function render (template) {
   if (isFunction(template)) {
     const startNode = document.createTextNode('')
     const endNode = document.createTextNode('')
-    startNode[_isDivider_] = true
-    endNode[_isDivider_] = true
     let nodes
 
     let isFirstRun = true
@@ -453,6 +384,47 @@ function setAttributeSafe (elem, key, value) {
   } else {
     elem.removeAttribute(key)
   }
+}
+
+/*******************************************************************************
+ *
+ * Render Stream
+ *
+ ******************************************************************************/
+
+function renderStream (array, fn) {
+  if (!fn) {
+    fn = (i) => i
+  }
+
+  const startNode = document.createTextNode('')
+  const endNode = document.createTextNode('')
+  const nodes = render(array.map(fn))
+
+  watchStream(array, {
+    onAdd (index, item) {
+      const node = render(fn(item))
+      let cursor = startNode.nextSibling
+      for (let i = 0; i < index; i++) {
+        cursor = cursor.nextSibling
+      }
+      cursor.parentNode.insertBefore(node, cursor)
+    },
+
+    onRemove (index) {
+      let cursor = startNode.nextSibling
+      for (let i = 0; i < index; i++) {
+        cursor = cursor.nextSibling
+      }
+      cursor.remove()
+    }
+  })
+
+  return [
+    startNode,
+    ...nodes,
+    endNode
+  ]
 }
 
 /*******************************************************************************

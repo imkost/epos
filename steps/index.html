@@ -1,0 +1,436 @@
+<!--
+TODOS:
+[x] middlewares
+[x] arrays (push$, pop$, etc)
+[x] transaction
+[x] other nodes/elements as inner // НЕ плагин, потому что требуется для stream
+[x] stream rendering
+[ ] render ordered arrays/streams
+[ ] ssr (renderAsString) / separate module?
+[ ] hydrate / separate module?
+
+// via plugins:
+[x] svg
+[x] raw code
+[x] mount/unmount
+
+Render plugins:
+- classArray
+- svgSupport (seems like cant be done via current plugins)
+- dataObject
+- rawCodeBlocks
+- useOfElements
+- camelCase
+- baseEvents
+- mount/unmount
+
+// Идея для SSR (hydrate):
+// Все document.craeteTextNode и document.createElemnet заменяем на свои
+// createTextNode и createElement
+// при обычном рендеринге это функции из document
+// при гидрации они выдают некие абстракции (например textNode === String, а element === Object)
+// Получаем дерево абстракций (vdom) а не настоящий рендеринг
+// умеем применять дерево абстракций на настроящий dom
+// if (!renderOptions) {
+//   renderOptions = {
+//     createTextNode: document.createTextNode.bind(document),
+//     createElement: document.createElement.bind(document),
+//     createDocumentFragment: document.createDocumentFragment.bind(document),
+//     appendChild,
+//     insertBefore
+//   }
+// }
+-->
+<!doctype html>
+<html>
+  <body>
+    <script src="20-continuous.js"></script>
+    <script>
+      const store = createSource({
+        show: true,
+        show2: false,
+        items: [
+          {title: 'first'},
+          {title: 'second'}
+        ],
+        selectedItemIndex: 0,
+        title: 'title',
+        href: '/ya',
+        number: 7,
+        numbers: [2,3,4,5,6,7,10,12,13]
+      })
+
+      function isLarge () {
+        return store.number$ > 5
+      }
+
+      function titleUpperCased () {
+        return store.title$.toUpperCase()
+      }
+
+      // SVG Support
+      let isInsideSvg = false
+      addRenderPlugin({
+        preprocess ({ state, template }) {
+          if (isObject(template)) {
+            if (template.tag === 'svg') {
+              isInsideSvg = true
+              console.log('svg');
+            }
+
+            if (isInsideSvg) {
+              template.xmlns = 'http://www.w3.org/2000/svg'
+            }
+          }
+        },
+
+        postprocess ({  }) {
+          isInsideSvg = false
+        }
+      })
+
+      addRenderPlugin({
+        preprocess ({ state, template }) {
+          if (template && template.class) {
+            const className = template.class
+
+            if (isFunction(className)) {
+              template.class = () => {
+                return classNameString(className())
+              }
+            } else if (className) {
+              template.class = classNameString(className)
+            }
+          }
+        }
+      })
+
+      const rawCodePlugin = {
+        preprocess ({ state, template }) {
+          if (template && template.innerHTML) {
+            state.innerHTML = template.innerHTML
+            delete template.innerHTML
+          }
+        },
+        postprocess ({ state, template, node }) {
+          if (state.innerHTML) {
+            if (typeof state.innerHTML === 'function') {
+              createAutorun(() => {
+                node.innerHTML = state.innerHTML()
+              })
+            } else {
+              node.innerHTML = state.innerHTML
+            }
+          }
+        }
+      }
+      addRenderPlugin(rawCodePlugin)
+
+      function classNameString (any) {
+        if (typeof any === 'string') {
+          return any
+        }
+
+        if (isArray(any)) {
+          return any
+            .filter(i => typeof i === 'string')
+            .map(i => i.trim())
+            .filter(Boolean)
+            .join(' ')
+        }
+
+        return null
+      }
+
+
+
+
+
+      /*******************************************************************************
+       *
+       * Mount/unmount
+       *
+       ******************************************************************************/
+
+      const elementsToObserve = new Set()
+      const pluginMountUnmount = {
+        preprocess ({ state, template }) {
+          if (!template) {
+            return
+          }
+
+          if (template.onMount) {
+            state.onMount = template.onMount
+            delete template.onMount
+          }
+
+          if (template.onUnmount) {
+            state.onUnmount = template.onUnmount
+            delete template.onUnmount
+          }
+        },
+        postprocess ({ state, template, node }) {
+          if (state.onMount || state.onUnmount) {
+            elementsToObserve.add(node)
+            node.onMount = state.onMount
+            node.onUnmount = state.onUnmount
+            startMo()
+          }
+        }
+      }
+
+      const mo = new MutationObserver(mutations => {
+        Array.from(elementsToObserve).forEach(elem => {
+          if (elem.__isMounted) {
+            if (!document.contains(elem)) {
+              if (elem.onUnmount) {
+                elem.onUnmount(elem)
+              }
+              elementsToObserve.delete(elem)
+              if (elementsToObserve.size === 0) {
+                stopMo()
+              }
+            }
+          } else {
+            if (document.contains(elem)) {
+              elem.__isMounted = true
+              if (elem.onMount) {
+                elem.onMount(elem)
+              }
+            }
+          }
+        })
+      })
+
+      function startMo () {
+        if (mo.__started) {
+          return
+        }
+        mo.__started = true
+        mo.observe(document, { childList: true, subtree: true })
+      }
+
+      function stopMo () {
+        if (mo.__started) {
+          mo.__started = false
+          mo.disconnect()
+        }
+      }
+
+      addRenderPlugin(pluginMountUnmount)
+
+
+
+
+
+      /*******************************************************************************
+       *
+       * Inner elements
+       *
+       ******************************************************************************/
+
+      const pluginInnerElement = {
+        preprocess ({ state, template, setNode }) {
+          if (template instanceof Node) {
+            setNode(template)
+          }
+        }
+      }
+      addRenderPlugin(pluginInnerElement)
+
+
+
+      const pp = render({
+        tag: 'b',
+        inner: 'view'
+      })
+
+      const app = render({
+        inner: [
+          {
+            innerHTML () {
+              if (store.show$) {
+                return '<h1>title</h1>'
+              }
+
+              return '<i>no show</i>'
+            }
+          },
+          {
+            inner () {
+              if (store.show$) {
+                return {
+                  inner: 'flicky',
+                  onUnmount: () => console.log('flicky unmount'),
+                  onMount: () => console.log('flicky mount')
+                }
+              }
+
+              return 'no flicky'
+            }
+          },
+          {
+            tag: 'i',
+            style: 'font-style: italic',
+            inner: 's'
+          },
+          () => {
+            if (store.show2$) {
+              return pp
+            }
+
+            return 'nothing'
+          },
+          {
+            inner () {
+              return store.items$[store.selectedItemIndex$].title$
+            }
+          }
+        ]
+      })
+
+      // makeTransaction(() => {
+      //   store.selectedItemIndex$ = 2
+      //   store.items.push$({ title: 'haha' })
+      // })
+
+      // const app = render({
+      //   inner () {
+      //     return store.items$.map(item => {
+      //       return {
+      //         inner: item
+      //       }
+      //       // return () => {
+      //       //   return [
+      //       //     {
+      //       //       inner: item
+      //       //     },
+      //       //     {
+      //       //       inner: '----'
+      //       //     }
+      //       //   ]
+      //       // }
+      //     })
+      //   }
+      // })
+
+      // const app = render({
+      //   inner () {
+      //     console.log('rerender');
+      //     return store.items$.map(item => {
+      //       const isLarge = () => item > store.number$
+      //       return () => {
+      //         if (getComputed(isLarge)) {
+      //           return {
+      //             inner: item
+      //           }
+      //         }
+      //       }
+      //     })
+      //   }
+      // })
+
+      const app1 = render({
+        class () {
+          return [
+            'app',
+            getComputed(isLarge) ? 'app_large' : null
+          ]
+        },
+        inner: [
+          {
+            inner: renderContinuous(store.items, item => {
+              return {
+                tag: 'h1',
+                inner: item.title.toUpperCase()
+              }
+            })
+          },
+          {
+            tag: 'hr'
+          },
+          {
+            inner () {
+              let sum = 0
+              store.numbers$.forEach(item => {
+                sum += item
+              })
+
+              return sum
+            }
+          },
+          {
+            inner () {
+              return store.numbers$.map(item => {
+                return {
+                  inner: item
+                }
+              })
+            }
+          }
+        ]
+      })
+
+      // createAutorun(() => {
+      //   if (store.show$) {
+      //     createAutorun(() => {
+      //       store.title$ // dep
+      //       console.log('nested autorun')
+      //     })
+
+      //     console.log('haha');
+
+      //     createAutorun(() => {
+      //       store.href$ // dep
+      //       console.log('nested autorun 2')
+      //     })
+      //   } else {
+      //     console.log('stop')
+      //   }
+      // })
+      // store.show$ = false
+      // store.title$ = 'haha'
+
+      // const app = render({
+      //   class: 'app',
+      //   inner: [
+      //     {
+      //       tag: 'a',
+      //       href () {
+      //         return store.href$
+      //       },
+      //       inner () {
+      //         return store.title$
+      //       }
+      //     },
+      //     {
+      //       tag: 'p',
+      //       onclick: createEventListener(e => {
+      //         console.log('click');
+      //         console.log(e);
+      //       }),
+      //       inner: [
+      //         'first',
+      //         () => {
+      //           if (!store.show$) {
+      //             return null
+      //           }
+
+      //           return [
+      //             { tag: 'a', href: '/ya', inner: 'welcome'},
+      //             {tag:'div', inner: () => {
+      //               console.log('rerun');
+      //               return store.title$
+      //             }}
+      //           ]
+      //         },
+      //         'last'
+      //       ]
+      //     }
+      //   ]
+      // })
+
+      document.body.appendChild(app1)
+    </script>
+  </body>
+</html>

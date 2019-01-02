@@ -1,6 +1,7 @@
 window.Epos = {
   // Reactivity
   createSource,
+  createStream,
   createAutorun,
   createStandaloneAutorun,
   getComputed,
@@ -8,6 +9,7 @@ window.Epos = {
 
   // Rendering
   render,
+  renderStream,
   createEventHandler,
   addRenderPlugin
 }
@@ -296,50 +298,12 @@ function makeTransaction (fn) {
  ******************************************************************************/
 
 function render (template) {
-  if (template instanceof window.Node) {
-    return template
+  if (template && template[_isStream_]) {
+    return renderStream(template)
   }
 
-  if (template && template[_isStream_]) {
-    const array = template
-    const startNode = document.createTextNode('')
-    const endNode = document.createTextNode('')
-    const nodes = render(array.slice())
-
-    watchStream(array, {
-      onAdd (index, item) {
-        const newNodes = toFlatArray(render(item))
-        let cursor = startNode.nextSibling
-        let i = 1
-        while (i <= index) {
-          cursor = cursor.nextSibling
-          if (!cursor[_isDivider_]) {
-            i += 1
-          }
-        }
-        for (const newNode of newNodes) {
-          cursor.parentNode.insertBefore(newNode, cursor)
-        }
-      },
-
-      onRemove (index) {
-        let cursor = startNode.nextSibling
-        let i = 1
-        while (i <= index) {
-          cursor = cursor.nextSibling
-          if (!cursor[_isDivider_]) {
-            i += 1
-          }
-        }
-        cursor.remove()
-      }
-    })
-
-    return [
-      startNode,
-      ...nodes,
-      endNode
-    ]
+  if (template instanceof window.Node) {
+    return template
   }
 
   if (isArray(template)) {
@@ -453,6 +417,57 @@ function setAttributeSafe (elem, key, value) {
   } else {
     elem.removeAttribute(key)
   }
+}
+
+/*******************************************************************************
+ *
+ * Render Stream
+ *
+ ******************************************************************************/
+
+function renderStream (array, fn) {
+  if (!fn) {
+    fn = (i) => i
+  }
+
+  const startNode = document.createTextNode('')
+  const endNode = document.createTextNode('')
+  const nodes = render(array.map(fn))
+
+  watchStream(array, {
+    onAdd (index, item) {
+      const newNodes = toFlatArray(render(fn(item)))
+      let cursor = startNode.nextSibling
+      let i = 0
+      while (i <= index) {
+        cursor = cursor.nextSibling
+        if (!cursor[_isDivider_]) {
+          i += 1
+        }
+      }
+      for (const newNode of newNodes) {
+        cursor.parentNode.insertBefore(newNode, cursor)
+      }
+    },
+
+    onRemove (index) {
+      let cursor = startNode.nextSibling
+      let i = 0
+      while (i <= index) {
+        cursor = cursor.nextSibling
+        if (!cursor[_isDivider_]) {
+          i += 1
+        }
+      }
+      cursor.remove()
+    }
+  })
+
+  return [
+    startNode,
+    ...nodes,
+    endNode
+  ]
 }
 
 /*******************************************************************************
