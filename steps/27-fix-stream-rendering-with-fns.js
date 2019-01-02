@@ -15,6 +15,7 @@ window.Epos = {
 let curGet = null
 let curAutorun = null
 let curTransaction = null
+let globalNodeId = 0
 const renderPlugins = []
 const computedSources = new Map()
 const _change_ = Symbol('change')
@@ -23,6 +24,7 @@ const _itemRemove_ = Symbol('itemRemove')
 const _isEventHandler_ = Symbol('isEventHandler')
 const _isStartNode_ = Symbol('isStartNode')
 const _isEndNode_ = Symbol('isEndNode')
+const _nodeId_ = Symbol('nodeId')
 const _isStream_ = Symbol('isStream')
 
 /*******************************************************************************
@@ -103,6 +105,7 @@ function createSource (initial, parentChange) {
       },
       splice (start, removeCount, ...items) {
         const removedItems = []
+        removeCount = Math.min(source.length - start, removeCount)
 
         for (let i = 0; i < removeCount; i++) {
           removedItems.push(source[start])
@@ -299,80 +302,150 @@ function render (template) {
 
   if (template && template[_isStream_]) {
     const stream = template
-    const startNode = document.createTextNode('[s]')
-    const endNode = document.createTextNode('[e]')
-    startNode[_isStartNode_] = true
-    endNode[_isEndNode_] = true
+    // const startNode = document.createTextNode('[s]')
+    // const endNode = document.createTextNode('[e]')
+    // startNode[_isStartNode_] = true
+    // endNode[_isEndNode_] = true
+    // startNode[_nodeId_] = globalNodeId
+    // endNode[_nodeId_] = globalNodeId
+    // globalNodeId += 1
     const nodes = render(stream.slice())
+    const startNode = nodes[0]
+    const endNode = nodes[nodes.length - 1]
 
     watchArray(stream, {
       onAdd (index, item) {
-        const newNodes = toFlatArray(render(item))
-        let cursor = startNode.nextSibling
         let i = 0
+        let cursor = startNode.nextSibling
+        const newNodes = toFlatArray(render(item))
+        let indexElem = null
 
-        while (true) {
+        while (cursor !== endNode) {
           if (cursor[_isStartNode_]) {
-            while (!cursor[_isEndNode_]) {
-              cursor = cursor.nextSibling
+            if (i === index) {
+              indexElem = cursor
+              break
             }
+            const nodeId = cursor[_nodeId_]
+            while (true) {
+              cursor = cursor.nextSibling
+              if (cursor[_isEndNode_] && cursor[_nodeId_] === nodeId) {
+                break
+              }
+            }
+            cursor = cursor.nextSibling
+            i += 1
+          } else {
+            if (i === index) {
+              indexElem = cursor
+              break
+            }
+            cursor = cursor.nextSibling
+            i += 1
           }
+        }
 
-          cursor = cursor.nextSibling
-
-          if (i === index + 1) {
-            break
-          }
-
-          i += 1
+        if (!indexElem) {
+          indexElem = endNode
         }
 
         for (const newNode of newNodes) {
-          cursor.parentNode.insertBefore(newNode, cursor)
+          indexElem.parentNode.insertBefore(newNode, indexElem)
         }
+
+        // while (true) {
+        //   if (cursor[_isStartNode_]) {
+        //     while (!cursor[_isEndNode_]) {
+        //       cursor = cursor.nextSibling
+        //     }
+        //   }
+
+        //   cursor = cursor.nextSibling
+
+        //   if (i === index + 1) {
+        //     break
+        //   }
+
+        //   i += 1
+        // }
+
+        // for (const newNode of newNodes) {
+        //   cursor.parentNode.insertBefore(newNode, cursor)
+        // }
       },
 
       onRemove (index) {
-        const nodesToRemove = []
         let i = 0
         let cursor = startNode.nextSibling
 
-        while (true) {
+        while (cursor !== endNode) {
           if (cursor[_isStartNode_]) {
-            if (i === index) {
-              nodesToRemove.push(cursor)
-            }
-            while (!cursor[_isEndNode_]) {
+            const nodes = [cursor]
+            const nodeId = cursor[_nodeId_]
+            while (true) {
               cursor = cursor.nextSibling
-              if (i === index) {
-                nodesToRemove.push(cursor)
+              nodes.push(cursor)
+              if (cursor[_isEndNode_] && cursor[_nodeId_] === nodeId) {
+                break
               }
             }
+            cursor = cursor.nextSibling
+            if (i === index) {
+              for (const node of nodes) {
+                node.remove()
+              }
+            }
+            i += 1
           } else {
             if (i === index) {
-              nodesToRemove.push(cursor)
+              cursor.remove()
+              break
             }
+            cursor = cursor.nextSibling
+            i += 1
           }
-
-          if (i === index) {
-            break
-          }
-
-          cursor = cursor.nextSibling
-          i += 1
         }
 
-        for (const node of nodesToRemove) {
-          node.remove()
-        }
+
+
+        // while (true) {
+        //   if (cursor[_isStartNode_]) {
+        //     if (i === index) {
+        //       nodesToRemove.push(cursor)
+        //     }
+        //     while (!cursor[_isEndNode_]) {
+        //       cursor = cursor.nextSibling
+        //       if (i === index) {
+        //         nodesToRemove.push(cursor)
+        //       }
+        //     }
+        //   } else {
+        //     if (i === index) {
+        //       nodesToRemove.push(cursor)
+        //     }
+        //   }
+
+        //   if (i === index) {
+        //     break
+        //   }
+
+        //   cursor = cursor.nextSibling
+        //   i += 1
+        // }
+
+        // for (const node of nodesToRemove) {
+        //   node.remove()
+        // }
       }
     })
 
-    return [
-      startNode,
-      ...nodes,
-      endNode
-    ]
+    return nodes
+
+    // return [
+    //   startNode,
+    //   ...nodes,
+    //   endNode
+    // ]
   }
 
   if (isArray(template)) {
@@ -380,6 +453,9 @@ function render (template) {
     const endNode = document.createTextNode('[e]')
     startNode[_isStartNode_] = true
     endNode[_isEndNode_] = true
+    startNode[_nodeId_] = globalNodeId
+    endNode[_nodeId_] = globalNodeId
+    globalNodeId += 1
 
     return [
       startNode,
@@ -393,6 +469,9 @@ function render (template) {
     const endNode = document.createTextNode('[e]')
     startNode[_isStartNode_] = true
     endNode[_isEndNode_] = true
+    startNode[_nodeId_] = globalNodeId
+    endNode[_nodeId_] = globalNodeId
+    globalNodeId += 1
     let nodes
 
     let isFirstRun = true
@@ -416,11 +495,14 @@ function render (template) {
       }
     })
 
-    return [
+    const fnArray = [
       startNode,
       ...nodes,
       endNode
     ]
+
+    fnArray._isStreamArray = true
+    return fnArray
   }
 
   let node

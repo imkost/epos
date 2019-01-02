@@ -24,53 +24,63 @@
 
       const app = render({
         class: 'app',
-        inner: {
-          inner: store.items.map$(char => {
-            return {
-              tag: 'h2',
-              inner: char.toUpperCase()
+        // inner: store.items.map$(char => {
+        //   return [
+        //     {
+        //       tag: 'h2',
+        //       inner: char.toUpperCase()
+        //     },
+        //     store.numbers.map$(number => {
+        //       return {
+        //         inner () {
+        //           return number.v$
+        //         }
+        //       }
+        //     })
+        //   ]
+        // })
+        inner: [
+          {
+            inner: strings.map$(string => {
+              return string
+            })
+          },
+
+          () => {
+            if (store.show$) {
+              const uppered = store.items.map$(item => {
+                return item.toUpperCase()
+              })
+
+              return uppered.map$(item => {
+                return item + '-'
+              })
             }
-          })
-          // {
-          //   inner: strings.map$(string => {
-          //     return string
-          //   })
-          // },
-          // () => {
-          //   if (store.show$) {
-          //     const uppered = store.items.map$(item => {
-          //       return item.toUpperCase()
-          //     })
 
-          //     return uppered.map$(item => {
-          //       return item + '-'
-          //     })
-          //   }
+            return {
+              tag: 'i',
+              inner: 'nothing'
+            }
+          },
 
-          //   return {
-          //     tag: 'i',
-          //     inner: 'nothing'
-          //   }
-          // },
-
-          // { // TODO: fix this case
-          //   inner: store.items.map$(char => {
-          //     return [
-          //       {
-          //         tag: 'h2',
-          //         inner: char.toUpperCase()
-          //       }
-          //       // store.numbers.map$(number => {
-          //       //   return {
-          //       //     inner () {
-          //       //       return number.v$
-          //       //     }
-          //       //   }
-          //       // })
-          //     ]
-          //   })
-          // }
-        }
+          { // TODO: fix this case
+            inner: store.items.map$(char => {
+              return [
+                {
+                  tag: 'h2',
+                  inner: char.toUpperCase()
+                },
+                store.numbers.map$(number => {
+                  return {
+                    inner () {
+                      return number.v$
+                    }
+                  }
+                })
+              ]
+            })
+          }
+        ]
       })
 
       document.body.appendChild(app)
