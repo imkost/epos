@@ -1,0 +1,32 @@
+{
+  "name": "epos",
+  "version": "1.0.0",
+  "description": "UI with granular reactivity",
+  "main": "index.js",
+  "scripts": {
+    "lint": "standard src/*.js",
+    "size": "size-limit",
+    "build": "node tools/build.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imkost/epos.git"
+  },
+  "author": "Konstantin Zemtsovsky <imkost@yandex.ru>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/imkost/epos/issues"
+  },
+  "size-limit": [
+    {
+      "limit": "4kb",
+      "path": "dist/epos.js"
+    }
+  ],
+  "homepage": "https://github.com/imkost/epos#readme",
+  "devDependencies": {
+    "jest": "^23.6.0",
+    "size-limit": "^0.21.1",
+    "standard": "^12.0.1"
+  }
+}

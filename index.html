@@ -1,7 +1,118 @@
 <!doctype html>
 <html>
   <body>
-    <script src="epos.js"></script>
-    <script src="perf.js"></script>
+    <script src="src/vars.js"></script>
+    <script src="src/utils.js"></script>
+    <script src="src/addRenderPlugin.js"></script>
+    <script src="src/callFns.js"></script>
+    <script src="src/createAutorun.js"></script>
+    <script src="src/createEventHandler.js"></script>
+    <script src="src/createSource.js"></script>
+    <script src="src/createSourceArray.js"></script>
+    <script src="src/createSourceObject.js"></script>
+    <script src="src/createStandaloneAutorun.js"></script>
+    <script src="src/createStream.js"></script>
+    <script src="src/dynamic.js"></script>
+    <script src="src/getComputed.js"></script>
+    <script src="src/makeTransaction.js"></script>
+    <script src="src/removeNode.js"></script>
+    <script src="src/render.js"></script>
+    <script src="src/renderArray.js"></script>
+    <script src="src/renderFunction.js"></script>
+    <script src="src/renderObject.js"></script>
+    <script src="src/renderStream.js"></script>
+    <script src="src/watchSourceArray.js"></script>
+
+    <script>
+      const store = dynamic({
+        show: true,
+        items: ['a', 'b', 'c'],
+        numbers: [
+          { v: 1 }
+        ]
+      })
+
+      const strings = store.numbers.map$(number => {
+        return `_"${number.v}"_`
+      })
+
+      const app = render({
+        class: 'app',
+        // inner: store.items.map$(char => {
+        //   return [
+        //     {
+        //       tag: 'h2',
+        //       inner: char.toUpperCase()
+        //     },
+        //     store.numbers.map$(number => {
+        //       return {
+        //         inner () {
+        //           return number.v$
+        //         }
+        //       }
+        //     })
+        //   ]
+        // })
+        inner: [
+          {
+            inner: strings.map$(string => {
+              return string
+            })
+          },
+
+          () => {
+            if (store.show$) {
+              const uppered = store.items.map$(item => {
+                return item.toUpperCase()
+              })
+
+              return uppered.map$(item => {
+                return item + '-'
+              })
+            }
+
+            return {
+              tag: 'i',
+              inner: 'nothing'
+            }
+          },
+
+          {
+            inner: store.items.map$(char => {
+              return [
+                {
+                  tag: 'h2',
+                  inner: char.toUpperCase()
+                },
+                store.numbers.map$(number => {
+                  return () => {
+                    if (store.show$) {
+                      return [
+                        {
+                          inner: store.items.map$(char => {
+                            return char.toUpperCase() + '-'
+                          })
+                        }
+                      ]
+                    }
+
+                    return {
+                      inner: 'not shown'
+                    }
+                  }
+                })
+              ]
+            })
+          }
+        ]
+      })
+
+      document.body.appendChild(app)
+
+      store.numbers.push$({ v: 7 })
+      store.items.push$('g')
+      store.items.splice$(1, 1, 'fa')
+      store.numbers.shift$()
+    </script>
   </body>
 </html>
