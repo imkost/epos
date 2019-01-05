@@ -1,13 +1,11 @@
-function watchSourceArray (sourceArray, { onAdd, onRemove }) {
-  if (sourceArray[_itemAdd_]) {
-    sourceArray[_itemAdd_].add(onAdd)
-    sourceArray[_itemRemove_].add(onRemove)
+function watchSourceArray (sourceArray, { onSplice }) {
+  if (sourceArray[_splice_]) {
+    sourceArray[_splice_].add(onSplice)
 
-    if (curAutorun) {
-      curAutorun.children.push({
+    if (curComputation) {
+      curComputation.children.push({
         stop () {
-          sourceArray[_itemAdd_].delete(onAdd)
-          sourceArray[_itemRemove_].delete(onRemove)
+          sourceArray[_splice_].delete(onSplice)
         }
       })
     }

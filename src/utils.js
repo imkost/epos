@@ -1,4 +1,10 @@
-/* eslint-disable no-unused-vars */
+function isStringOrNumber (any) {
+  return typeof any === 'string' || typeof any === 'number'
+}
+
+function isFunction (any) {
+  return typeof any === 'function'
+}
 
 function isObject (any) {
   return Object.prototype.toString.call(any) === '[object Object]'
@@ -10,14 +16,6 @@ function isArray (any) {
 
 function isStream (any) {
   return any && any[_isStream_]
-}
-
-function isFunction (any) {
-  return typeof any === 'function'
-}
-
-function isStringOrNumber (any) {
-  return typeof any === 'string' || typeof any === 'number'
 }
 
 function toFlatArray (any) {

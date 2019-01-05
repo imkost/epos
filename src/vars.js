@@ -1,7 +1,5 @@
-/* eslint-disable no-unused-vars */
-
 let curGet = null
-let curAutorun = null
+let curComputation = null
 let curTransaction = null
 let globalNodeId = 0
 const renderPlugins = []

@@ -1,8 +1,6 @@
 function createSourceArray (array, parentChange) {
-  const source = array.map(i => createSource(i, parentChange))
+  const source = array.map(i => createSource(i))
   source[_splice_] = new Set()
-  // source[_itemAdd_] = new Set()
-  // source[_itemRemove_] = new Set()
 
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
@@ -21,7 +19,7 @@ function createSourceArray (array, parentChange) {
   }
 
   function push$ (item) {
-    splice$(source.length, item)
+    splice$(source.length, 0, item)
     return source.length
   }
 
@@ -45,28 +43,3 @@ function createSourceArray (array, parentChange) {
     return createStream(source, fn)
   }
 }
-
-function sourceArrayAdd (source, index, item) {
-  item = createSource(item)
-  source.splice(index, 0, item)
-  callFns(source[_itemAdd_], index, item)
-}
-
-function sourceArrayRemove (source, index) {
-  if (index in source) {
-    source.splice(index, 1)
-    callFns(source[_itemRemove_], index)
-  }
-}
-
-
-
-
-
-// if (start < 0) {
-//   start = source.length - start
-// } else if (start >= source.length) {
-//   start = source.length
-// }
-
-// removeCount = Math.min(source.length - start, removeCount)

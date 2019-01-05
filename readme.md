@@ -143,11 +143,6 @@ Stream — это source-массив с процессингом и continuous.
 //   }
 // })
 
-// for (const key in document) {
-//   mm.push(key)
-// }
-// mm.filter(function(i){return i.substring(0,2)=='on'&&(document[i]==null||typeof document[i]=='function');})
-
 /* global _change_ */
 /* global _isEndNode_ */
 /* global _isEventHandler_ */

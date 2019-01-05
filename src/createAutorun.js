@@ -1,30 +1,30 @@
-let autorunsCount = 0
+let computationsCount = 0
 
 function createAutorun (fn) {
-  autorunsCount += 1
+  computationsCount += 1
   let deps = []
-  const autorun = {
+  const computation = {
     stop,
     children: []
   }
 
-  if (curAutorun) {
-    curAutorun.children.push(autorun)
+  if (curComputation) {
+    curComputation.children.push(computation)
   }
 
   run()
 
-  return autorun
+  return computation
 
   function run () {
     stop(false)
     const parentGet = curGet
-    const parentAutorun = curAutorun
+    const parentComputation = curComputation
     curGet = get
-    curAutorun = autorun
+    curComputation = computation
     fn()
     curGet = parentGet
-    curAutorun = parentAutorun
+    curComputation = parentComputation
   }
 
   function get (change) {
@@ -34,16 +34,23 @@ function createAutorun (fn) {
 
   function stop (isDestroy = true) {
     if (isDestroy) {
-      autorunsCount -= 1
+      computationsCount -= 1
     }
-    for (const child of autorun.children) {
+    for (const child of computation.children) {
       child.stop()
     }
-    autorun.children = []
+    computation.children = []
 
     for (const change of deps) {
       change.delete(run)
     }
     deps = []
   }
+}
+
+function createStandaloneAutorun (fn) {
+  const parentComputation = curComputation
+  curComputation = null
+  createAutorun(fn)
+  curComputation = parentComputation
 }

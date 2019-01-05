@@ -1,16 +1,16 @@
 <!doctype html>
 <html>
   <body>
+    <script src="src/whole.js"></script>
+    <!--
     <script src="src/vars.js"></script>
     <script src="src/utils.js"></script>
     <script src="src/addRenderPlugin.js"></script>
     <script src="src/callFns.js"></script>
     <script src="src/createAutorun.js"></script>
-    <script src="src/createEventHandler.js"></script>
     <script src="src/createSource.js"></script>
     <script src="src/createSourceArray.js"></script>
     <script src="src/createSourceObject.js"></script>
-    <script src="src/createStandaloneAutorun.js"></script>
     <script src="src/createStream.js"></script>
     <script src="src/dynamic.js"></script>
     <script src="src/getComputed.js"></script>
@@ -22,6 +22,7 @@
     <script src="src/renderObject.js"></script>
     <script src="src/renderStream.js"></script>
     <script src="src/watchSourceArray.js"></script>
+    -->
 
     <script>
       const store = dynamic({
@@ -36,8 +37,15 @@
         return `_"${number.v}"_`
       })
 
+      const uppered = store.items.map$(item => {
+        return item.toUpperCase()
+      })
+
       const app = render({
         class: 'app',
+        onclick (e) {
+          console.log('click', e)
+        },
         // inner: store.items.map$(char => {
         //   return [
         //     {
@@ -62,10 +70,6 @@
 
           () => {
             if (store.show$) {
-              const uppered = store.items.map$(item => {
-                return item.toUpperCase()
-              })
-
               return uppered.map$(item => {
                 return item + '-'
               })

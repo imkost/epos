@@ -3,12 +3,9 @@ function createStream (sourceArray, fn) {
   stream[_isStream_] = true
 
   watchSourceArray(sourceArray, {
-    onAdd (index, item) {
-      stream.splice$(index, 0, createSource(fn(item)))
-    },
-
-    onRemove (index) {
-      stream.splice$(index, 1)
+    onSplice (start, removeCount, ...items) {
+      items = items.map(i => createSource(fn(i)))
+      stream.splice$(start, removeCount, ...items)
     }
   })
 
