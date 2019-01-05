@@ -38,8 +38,8 @@ test('render array', () => {
   ])
 
   assert(ns.length === 4)
-  assert(ns[0][_isStartNode_])
-  assert(ns[3][_isEndNode_])
+  assert(_boundaryId_ in ns[0])
+  assert(_boundaryId_ in ns[3])
   assert(ns[1].className === 'a')
   assert(ns[1].textContent === 'first')
 })
@@ -108,6 +108,12 @@ test('render stream', () => {
 
   store.items[1].title$ = 'G'
   assert(app.innerText === 'FG')
+
+  store.items.splice$(4, 10, { title: 'u' })
+  assert(app.innerText === 'FGU')
+
+  store.items.splice$(1, -2, { title: 'p' })
+  assert(app.innerText === 'FPGU')
 })
 
 test('autorun base', () => {

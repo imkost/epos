@@ -25,16 +25,15 @@ window.Epos = {
 let curGet = null
 let curComputation = null
 let curStack = null
-let globalNodeId = 0
+let globalNodeId = 1
+let boundaryIndex = 1
 const events = getAllEvents()
 const plugins = [] // render plugins
 const computed = new Map() // fn => source
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
-const _isStartNode_ = Symbol('isStartNode')
-const _isEndNode_ = Symbol('isEndNode')
-const _nodeId_ = Symbol('nodeId')
 const _isStream_ = Symbol('isStream')
+const _boundaryId_ = Symbol('boundaryId')
 
 /*******************************************************************************
  *
@@ -131,7 +130,7 @@ function createSourceArray (array, parentChange) {
   }
 
   function push$ (item) {
-    splice$(source.length, 0, createSource(item))
+    splice$(source.length, 0, item)
     return source.length
   }
 
@@ -146,11 +145,14 @@ function createSourceArray (array, parentChange) {
   }
 
   function splice$ (start, removeCount, ...items) {
-    items = items.map(i => createSource(i))
     if (start < 0) {
       start = Math.max(0, source.length + start)
+    } else if (start > source.length - 1) {
+      start = source.length
     }
-    removeCount = Math.min(source.length - start, removeCount)
+    removeCount = Math.max(0, Math.min(source.length - start, removeCount))
+
+    items = items.map(i => createSource(i))
 
     const removed = source.splice(start, removeCount, ...items)
     callFns(source[_splice_], start, removeCount, ...items)
@@ -216,11 +218,9 @@ function createStream (sourceArray, fn) {
   const stream = createSource(sourceArray.map(fn))
   stream[_isStream_] = true
 
-  watchSourceArray(sourceArray, {
-    onSplice (start, removeCount, ...items) {
-      items = items.map(i => createSource(fn(i)))
-      stream.splice$(start, removeCount, ...items)
-    }
+  onSplice(sourceArray, (start, removeCount, ...items) => {
+    items = items.map(i => createSource(fn(i)))
+    stream.splice$(start, removeCount, ...items)
   })
 
   return stream
@@ -386,21 +386,7 @@ function setAttributeSafe (elem, key, value) {
  ******************************************************************************/
 
 function renderArray (template) {
-  const startNode = document.createTextNode('')
-  const endNode = document.createTextNode('')
-
-  // TODO: массивы рендерить без боундари, с боундари рендерить только fn и stream
-  // startNode[_nodeDividerId_] = globalNodeId
-  // startNode = createDividerNode()
-  // create boundary node
-  // startNode[_boundaryId_]
-
-  startNode[_isStartNode_] = true
-  endNode[_isEndNode_] = true
-  startNode[_nodeId_] = globalNodeId
-  endNode[_nodeId_] = globalNodeId
-  globalNodeId += 1
-
+  const [startNode, endNode] = createBoundaryNodes()
   return [
     startNode,
     ...toFlatArray(template.map(render)),
@@ -415,13 +401,7 @@ function renderArray (template) {
  ******************************************************************************/
 
 function renderFunction (template) {
-  const startNode = document.createTextNode('')
-  const endNode = document.createTextNode('')
-  startNode[_isStartNode_] = true
-  endNode[_isEndNode_] = true
-  startNode[_nodeId_] = globalNodeId
-  endNode[_nodeId_] = globalNodeId
-  globalNodeId += 1
+  const [startNode, endNode] = createBoundaryNodes()
   let nodes
 
   let isFirstRun = true
@@ -470,57 +450,57 @@ function renderStream (stream) {
   const startNode = nodes[0]
   const endNode = nodes[nodes.length - 1]
 
-  watchSourceArray(stream, {
-    onSplice (start, removeCount, ...items) {
-      let i = 0
-      let cursor = startNode.nextSibling
+  onSplice(stream, (start, removeCount, ...items) => {
+    let i = 0
+    let cursor = startNode.nextSibling
+    let bid = startNode[_boundaryId_]
 
-      if (!cursor) {
-        console.log('strange')
-        return
-      }
+    if (!cursor) {
+      console.log('strange')
+      return
+    }
 
-      const children = []
+    const children = []
 
-      while (cursor !== endNode) {
-        if (cursor[_isStartNode_]) {
-          const nodes = []
-          const nodeId = cursor[_nodeId_]
-          while (true) {
-            nodes.push(cursor)
-            if (cursor[_isEndNode_] && cursor[_nodeId_] === nodeId) {
-              break
-            }
-            cursor = cursor.nextSibling
+    while (cursor !== endNode) {
+      if (cursor[_boundaryId_]) {
+        const nodes2 = []
+        const boundaryId = cursor[_boundaryId_]
+        while (true) {
+          nodes2.push(cursor)
+          cursor = cursor.nextSibling
+          if (cursor[_boundaryId_] === boundaryId) {
+            nodes2.push(cursor)
+            break
           }
-          children.push(nodes)
-        } else {
-          children.push(cursor)
         }
-
-        cursor = cursor.nextSibling
+        children.push(nodes2)
+      } else {
+        children.push(cursor)
       }
 
-      const nodesToRemove = []
-      const bef = toFlatArray(children[start] || endNode)[0]
+      cursor = cursor.nextSibling
+    }
 
-      for (i = 0; i < removeCount; i++) {
-        const cc = toFlatArray(children[start + i])
-        for (const c of cc) {
-          nodesToRemove.push(c)
-        }
-      }
+    const nodesToRemove = []
+    const bef = toFlatArray(children[start] || endNode)[0]
 
-      for (const item of items) {
-        const ii = toFlatArray(render(item))
-        for (const i of ii) {
-          bef.parentNode.insertBefore(i, bef)
-        }
+    for (i = 0; i < removeCount; i++) {
+      const cc = toFlatArray(children[start + i])
+      for (const c of cc) {
+        nodesToRemove.push(c)
       }
+    }
 
-      for (const n of nodesToRemove) {
-        removeNode(n)
+    for (const item of items) {
+      const ii = toFlatArray(render(item))
+      for (const i of ii) {
+        bef.parentNode.insertBefore(i, bef)
       }
+    }
+
+    for (const n of nodesToRemove) {
+      removeNode(n)
     }
   })
 
@@ -592,14 +572,14 @@ function removeNode (node) {
   node.remove()
 }
 
-function watchSourceArray (sourceArray, { onSplice }) {
+function onSplice (sourceArray, fn) {
   if (sourceArray[_splice_]) {
-    sourceArray[_splice_].add(onSplice)
+    sourceArray[_splice_].add(fn)
 
     if (curComputation) {
       curComputation.children.push({
         stop () {
-          sourceArray[_splice_].delete(onSplice)
+          sourceArray[_splice_].delete(fn)
         }
       })
     }
@@ -634,4 +614,13 @@ function getAllEvents () {
   }
 
   return events
+}
+
+function createBoundaryNodes () {
+  const startNode = document.createTextNode('')
+  const endNode = document.createTextNode('')
+  startNode[_boundaryId_] = boundaryIndex
+  endNode[_boundaryId_] = boundaryIndex
+  boundaryIndex += 1
+  return [startNode, endNode]
 }
