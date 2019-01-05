@@ -219,7 +219,7 @@ function createStream (sourceArray, fn) {
   stream[_isStream_] = true
 
   onSplice(sourceArray, (start, removeCount, ...items) => {
-    items = items.map(i => createSource(fn(i)))
+    items = items.map(i => fn(i))
     stream.splice$(start, removeCount, ...items)
   })
 
