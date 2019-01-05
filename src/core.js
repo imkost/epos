@@ -23,13 +23,12 @@ window.Epos = {
  ******************************************************************************/
 
 let curGet = null
-let curComputation = null
+let curComp = null
 let curStack = null
-let globalNodeId = 1
 let boundaryIndex = 1
 const events = getAllEvents()
-const plugins = [] // render plugins
-const computed = new Map() // fn => source
+const plugins = []
+const computed = new Map()
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _isStream_ = Symbol('isStream')
@@ -234,28 +233,28 @@ function createStream (sourceArray, fn) {
 
 function autorun (fn, isStandalone = false) {
   let deps = []
-  const computation = {
+  const comp = {
     stop,
     children: []
   }
 
-  if (curComputation && !isStandalone) {
-    curComputation.children.push(computation)
+  if (curComp && !isStandalone) {
+    curComp.children.push(comp)
   }
 
   run()
 
-  return computation
+  return comp
 
   function run () {
     stop()
     const parentGet = curGet
-    const parentComputation = curComputation
+    const parentComp = curComp
     curGet = get
-    curComputation = computation
+    curComp = comp
     fn()
     curGet = parentGet
-    curComputation = parentComputation
+    curComp = parentComp
   }
 
   function get (change) {
@@ -264,10 +263,10 @@ function autorun (fn, isStandalone = false) {
   }
 
   function stop () {
-    for (const child of computation.children) {
+    for (const child of comp.children) {
       child.stop()
     }
-    computation.children = []
+    comp.children = []
 
     for (const change of deps) {
       change.delete(run)
@@ -576,8 +575,8 @@ function onSplice (sourceArray, fn) {
   if (sourceArray[_splice_]) {
     sourceArray[_splice_].add(fn)
 
-    if (curComputation) {
-      curComputation.children.push({
+    if (curComp) {
+      curComp.children.push({
         stop () {
           sourceArray[_splice_].delete(fn)
         }
