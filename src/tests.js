@@ -256,12 +256,92 @@ test('transaction', () => {
   assert(app.innerText === 'd')
 })
 
+// test('complex', () => {
+//   const store = dynamic({
+//     show: true,
+//     items: ['a', 'b', 'c'],
+//     numbers: [
+//       { v: 1 }
+//     ]
+//   })
+
+//   const strings = store.numbers.map$(number => {
+//     return `_${number.v}_`
+//   })
+
+//   const uppered = store.items.map$(item => {
+//     return item.toUpperCase()
+//   })
+
+//   const app = render({
+//     class: 'app',
+//     inner: [
+//       {
+//         class: 'strings',
+//         inner: strings.map$(string => {
+//           return string
+//         })
+//       },
+
+//       () => {
+//         if (store.show$) {
+//           return uppered.map$(item => {
+//             return item + '-'
+//           })
+//         }
+
+//         return {
+//           tag: 'i',
+//           inner: 'nothing'
+//         }
+//       },
+
+//       {
+//         inner: store.items.map$(char => {
+//           return [
+//             {
+//               tag: 'h2',
+//               inner: char.toUpperCase()
+//             },
+//             store.numbers.map$(number => {
+//               return () => {
+//                 if (store.show$) {
+//                   return [
+//                     {
+//                       class: 'a',
+//                       inner: store.items.map$(char => {
+//                         return char.toUpperCase() + '-'
+//                       })
+//                     }
+//                   ]
+//                 }
+//                 return {
+//                   inner: 'not shown'
+//                 }
+//               }
+//             })
+//           ]
+//         })
+//       }
+//     ]
+//   })
+
+//   store.numbers.push$({ v: 7 })
+//   store.items.push$('g')
+//   store.items.splice$(1, 1, 'fa')
+//   store.numbers.shift$()
+
+//   window.app = app
+//   document.body.appendChild(app)
+//   // app.querySelector()
+// })
+
 function test (what, fn) {
   try {
     fn()
-    console.log(`> ${what}: OK`)
+    console.log('%c+ ' + what, 'color: green')
   } catch (err) {
-    console.log(`> ${what}: BAD`)
+    console.log(`%c✕ ${what}`, 'color: red')
     console.error(err)
   }
 }

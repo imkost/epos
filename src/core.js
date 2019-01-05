@@ -1,13 +1,4 @@
-window.Epos = {
-  dynamic,
-  autorun,
-  transaction,
-  render,
-  useRenderPlugin
-}
-
 // TODO: if autorun has zero deps => destroy
-
 // window.Epos = {
 //   render,
 //   dynamic,
@@ -31,6 +22,7 @@ const plugins = []
 const computed = new Map()
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
+const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
 
@@ -235,11 +227,11 @@ function autorun (fn, isStandalone = false) {
   let deps = []
   const comp = {
     stop,
-    children: []
+    [_children_]: []
   }
 
   if (curComp && !isStandalone) {
-    curComp.children.push(comp)
+    curComp[_children_].push(comp)
   }
 
   run()
@@ -263,10 +255,10 @@ function autorun (fn, isStandalone = false) {
   }
 
   function stop () {
-    for (const child of comp.children) {
+    for (const child of comp[_children_]) {
       child.stop()
     }
-    comp.children = []
+    comp[_children_] = []
 
     for (const change of deps) {
       change.delete(run)
@@ -576,7 +568,7 @@ function onSplice (sourceArray, fn) {
     sourceArray[_splice_].add(fn)
 
     if (curComp) {
-      curComp.children.push({
+      curComp[_children_].push({
         stop () {
           sourceArray[_splice_].delete(fn)
         }
