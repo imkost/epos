@@ -61,27 +61,6 @@ Stream — это source-массив с процессингом и continuous.
 
 // useRenderPlugin({
 //   preprocess ({ state, template }) {
-//     if (template && template.class) {
-//       state.class = template.class
-//       delete template.class
-//     }
-//   },
-//   postprocess ({ state, node }) {
-//     if (state.class) {
-//       autorun(() => {
-//         const className = [].concat(dynamic(state.class))
-//           .filter(c => c && typeof c === 'string')
-//           .join(' ')
-//           .split(/\s+/)
-//           .join(' ')
-//         node.setAttribute('class', className)
-//       })
-//     }
-//   }
-// })
-
-// useRenderPlugin({
-//   preprocess ({ state, template }) {
 //     if (template && isObject(template.style)) {
 //       state.style = template.style
 //       delete template.style
