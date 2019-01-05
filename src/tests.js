@@ -256,6 +256,48 @@ test('transaction', () => {
   assert(app.innerText === 'd')
 })
 
+test('stop autoruns for removed elements', () => {
+  const store = dynamic({
+    title: 'a',
+    shown: true
+  })
+
+  let hrefRuns = 0
+  let titleRuns = 0
+  const app = render({
+    inner () {
+      if (store.shown$) {
+        return {
+          class: 'wrap',
+          inner: {
+            class: 'title',
+            href () {
+              hrefRuns += 1
+              return store.title$
+            },
+            inner () {
+              titleRuns += 1
+              return store.title$
+            }
+          }
+        }
+      }
+      return 'hidden'
+    }
+  })
+
+  assert(titleRuns === 1)
+
+  store.title$ = 'b'
+  assert(titleRuns === 2)
+
+  store.shown$ = false
+  store.title$ = 'c'
+  store.title$ = 'd'
+  console.log(titleRuns)
+  console.log(hrefRuns);
+})
+
 // test('complex', () => {
 //   const store = dynamic({
 //     show: true,

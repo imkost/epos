@@ -4,7 +4,7 @@
   "description": "UI with granular reactivity",
   "main": "index.js",
   "scripts": {
-    "lint": "standard src/*.js",
+    "lint": "standard src/core.js",
     "size": "size-limit",
     "build": "node tools/build.js"
   },

@@ -1,85 +1,87 @@
-(() => {/* eslint-disable no-unused-vars */
+
+  ;(() => {
+    Object.assign(window, {
+      render,
+      dynamic,
+      autorun,
+      transaction,
+      useRenderPlugin
+    })
+    // TODO: if autorun has zero deps => destroy
+// window.Epos = {
+//   render,
+//   dynamic,
+//   autorun,
+//   transaction,
+//   useRenderPlugin
+// }
+
+/*******************************************************************************
+ *
+ * VARS
+ *
+ ******************************************************************************/
 
 let curGet = null
-let curAutorun = null
-let curTransaction = null
-let globalNodeId = 0
-const renderPlugins = []
-const computedSources = new Map()
+let curComp = null
+let curStack = null
+let boundaryIndex = 1
+const events = getAllEvents()
+const plugins = []
+const computed = new Map()
 const _change_ = Symbol('change')
-const _itemAdd_ = Symbol('itemAdd')
-const _itemRemove_ = Symbol('itemRemove')
-const _isEventHandler_ = Symbol('isEventHandler')
-const _isStartNode_ = Symbol('isStartNode')
-const _isEndNode_ = Symbol('isEndNode')
-const _nodeId_ = Symbol('nodeId')
+const _splice_ = Symbol('splice')
+const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
+const _boundaryId_ = Symbol('boundaryId')
 
-/* eslint-disable no-unused-vars */
+/*******************************************************************************
+ *
+ * DYNAMIC
+ *
+ ******************************************************************************/
 
-function isObject (any) {
-  return Object.prototype.toString.call(any) === '[object Object]'
-}
-
-function isArray (any) {
-  return Array.isArray(any)
-}
-
-function isFunction (any) {
-  return typeof any === 'function'
-}
-
-function isStringOrNumber (any) {
-  return typeof any === 'string' || typeof any === 'number'
-}
-
-function toFlatArray (any) {
-  return isArray(any) ? flatten(any) : [any]
-}
-
-function flatten (array) {
-  let flat = []
-  for (const item of array) {
-    if (isArray(item)) {
-      flat = flat.concat(flatten(item))
-    } else {
-      flat.push(item)
-    }
-  }
-  return flat
-}
-
-/* global curGet */
-/* global _change_ */
-/* global _itemAdd_ */
-/* global _itemRemove_ */
-
-/* global createStream */
-/* global callFns */
-/* global isArray */
-/* global isObject */
-
-function createSource (initial, parentChange) {
-  if (isObject(initial)) {
-    return createSourceFromObject(initial)
+function dynamic (any) {
+  if (isFunction(any)) {
+    return getComputed(any)
   }
 
-  if (isArray(initial)) {
-    return createSourceFromArray(initial, parentChange)
-  }
-
-  return initial
+  return createSource(any)
 }
 
-function createSourceFromObject (object) {
+/*******************************************************************************
+ *
+ * CREATE SOURCE
+ *
+ ******************************************************************************/
+
+function createSource (any, parentChange) {
+  if (isObject(any)) {
+    return createSourceObject(any)
+  }
+
+  if (isArray(any)) {
+    return createSourceArray(any, parentChange)
+  }
+
+  return any
+}
+
+/*******************************************************************************
+ *
+ * CREATE SOURCE OBJECT
+ *
+ ******************************************************************************/
+
+function createSourceObject (object) {
   const source = {}
   source[_change_] = {}
 
   for (const key in object) {
     const value = object[key]
     const change = new Set()
-    source[key] = createSource(value, change)
     source[_change_][key] = change
+    source[key] = createSource(value, change)
 
     Object.defineProperty(source, `${key}$`, {
       get () {
@@ -88,7 +90,6 @@ function createSourceFromObject (object) {
         }
         return source[key]
       },
-
       set (newValue) {
         if (source[key] !== newValue) {
           source[key] = createSource(newValue, change)
@@ -102,11 +103,15 @@ function createSourceFromObject (object) {
   return source
 }
 
-function createSourceFromArray (array, parentChange) {
-  const source = array.map(createSource)
-  const callParentChange = () => callFns(parentChange)
-  source[_itemAdd_] = new Set()
-  source[_itemRemove_] = new Set()
+/*******************************************************************************
+ *
+ * CREATE SOURCE ARRAY
+ *
+ ******************************************************************************/
+
+function createSourceArray (array, parentChange) {
+  const source = array.map(i => createSource(i))
+  source[_splice_] = new Set()
 
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
@@ -120,43 +125,37 @@ function createSourceFromArray (array, parentChange) {
   return source
 
   function pop$ () {
-    const lastIndex = source.length - 1
-    const lastItem = source[lastIndex]
-    sourceArrayRemove(source, lastIndex)
-    callParentChange()
-    return lastItem
+    const removed = splice$(source.length - 1, 1)
+    return removed[0]
   }
 
   function push$ (item) {
-    sourceArrayAdd(source, source.length, item)
-    callParentChange()
+    splice$(source.length, 0, item)
     return source.length
   }
 
   function shift$ () {
-    const firstItem = source[0]
-    sourceArrayRemove(0)
-    callParentChange()
-    return firstItem
+    const removed = splice$(0, 1)
+    return removed[0]
   }
 
   function unshift$ (item) {
-    sourceArrayAdd(0, item)
-    callParentChange()
+    splice$(0, 0, item)
     return source.length
   }
 
   function splice$ (start, removeCount, ...items) {
-    const removed = []
-    removeCount = Math.min(source.length - start, removeCount)
-    for (let i = 0; i < removeCount; i++) {
-      removed.push(source[start])
-      sourceArrayRemove(start)
+    if (start < 0) {
+      start = Math.max(0, source.length + start)
+    } else if (start > source.length - 1) {
+      start = source.length
     }
-    for (let i = 0; i < items.length; i++) {
-      sourceArrayAdd(Math.min(start + i, source.length), items[i])
-    }
-    callParentChange()
+    removeCount = Math.max(0, Math.min(source.length - start, removeCount))
+
+    items = items.map(i => createSource(i))
+
+    const removed = source.splice(start, removeCount, ...items)
+    callFns(source[_splice_], start, removeCount, ...items)
     return removed
   }
 
@@ -165,73 +164,63 @@ function createSourceFromArray (array, parentChange) {
   }
 }
 
-function sourceArrayAdd (source, index, item) {
-  item = createSource(item)
-  source.splice(index, 0, item)
-  callFns(source[_itemAdd_], index, item)
-}
+/*******************************************************************************
+ *
+ * GET COMPUTED
+ *
+ ******************************************************************************/
 
-function sourceArrayRemove (source, index) {
-  if (index in source) {
-    source.splice(index, 1)
-    callFns(source[_itemRemove_], index)
+function getComputed (fn) {
+  for (const [key, source] of computed) {
+    if (source[_change_].value.size === 0) {
+      computed.delete(key)
+    }
   }
-}
 
-/* global _change_ */
-/* global _isEndNode_ */
-/* global _isEventHandler_ */
-/* global _isStartNode_ */
-/* global _itemAdd_ */
-/* global _itemRemove_ */
-/* global _nodeId_ */
-/* global computedSources */
-/* global curTransaction */
-/* global globalNodeId */
-/* global isArray */
-/* global isFunction */
-/* global isStringOrNumber */
-/* global renderPlugins */
-/* global toFlatArray */
-/* global createSource */
-/* global isObject */
-/* global _isStream_ */
-/* global createStream */
-/* global curGet:true */
-/* global curAutorun:true */
+  if (!computed.has(fn)) {
+    const source = createSource({
+      value: void 0
+    })
 
-window.Epos = {
-  // Reactivity
-  createSource,
-  createAutorun,
-  createStandaloneAutorun,
-  getComputed,
-  makeTransaction,
+    autorun(() => {
+      source.value$ = fn()
+    }, true)
 
-  // Rendering
-  render,
-  createEventHandler,
-  addRenderPlugin
+    computed.set(fn, source)
+  }
+
+  return computed.get(fn).value$
 }
 
 /*******************************************************************************
  *
- * Stream
+ * TRANSACTION
  *
  ******************************************************************************/
 
-function createStream (array, fn) {
-  const stream = createSource(array.map(fn))
+function transaction (fn) {
+  const parentStack = curStack
+  curStack = []
+  fn()
+  for (const callback of curStack) {
+    callback()
+  }
+  curStack = parentStack
+}
+
+/*******************************************************************************
+ *
+ * CREATE STREAM
+ *
+ ******************************************************************************/
+
+function createStream (sourceArray, fn) {
+  const stream = createSource(sourceArray.map(fn))
   stream[_isStream_] = true
 
-  watchArray(array, {
-    onAdd (index, item) {
-      stream.splice$(index, 0, createSource(fn(item)))
-    },
-
-    onRemove (index) {
-      stream.splice$(index, 1)
-    }
+  onSplice(sourceArray, (start, removeCount, ...items) => {
+    items = items.map(i => fn(i))
+    stream.splice$(start, removeCount, ...items)
   })
 
   return stream
@@ -239,37 +228,34 @@ function createStream (array, fn) {
 
 /*******************************************************************************
  *
- * Autorun
+ * AUTORUN
  *
  ******************************************************************************/
 
-let autorunsCount = 0
-
-function createAutorun (fn) {
-  autorunsCount += 1
+function autorun (fn, isStandalone = false) {
   let deps = []
-  const autorun = {
+  const comp = {
     stop,
-    children: []
+    [_children_]: []
   }
 
-  if (curAutorun) {
-    curAutorun.children.push(autorun)
+  if (curComp && !isStandalone) {
+    curComp[_children_].push(comp)
   }
 
   run()
 
-  return autorun
+  return comp
 
   function run () {
-    stop(false)
+    stop()
     const parentGet = curGet
-    const parentAutorun = curAutorun
+    const parentComp = curComp
     curGet = get
-    curAutorun = autorun
+    curComp = comp
     fn()
     curGet = parentGet
-    curAutorun = parentAutorun
+    curComp = parentComp
   }
 
   function get (change) {
@@ -277,14 +263,11 @@ function createAutorun (fn) {
     deps.push(change)
   }
 
-  function stop (isDestroy = true) {
-    if (isDestroy) {
-      autorunsCount -= 1
-    }
-    for (const child of autorun.children) {
+  function stop () {
+    for (const child of comp[_children_]) {
       child.stop()
     }
-    autorun.children = []
+    comp[_children_] = []
 
     for (const change of deps) {
       change.delete(run)
@@ -295,70 +278,7 @@ function createAutorun (fn) {
 
 /*******************************************************************************
  *
- * Standalone Autorun
- *
- ******************************************************************************/
-
-function createStandaloneAutorun (fn) {
-  const parentAutorun = curAutorun
-  curAutorun = null
-  createAutorun(fn)
-  curAutorun = parentAutorun
-}
-
-/*******************************************************************************
- *
- * Computed
- *
- ******************************************************************************/
-
-function getComputed (any) {
-  if (!isFunction(any)) {
-    return any
-  }
-
-  const fn = any
-
-  for (const [key, source] of computedSources) {
-    if (source[_change_].value.size === 0) {
-      computedSources.delete(key)
-    }
-  }
-
-  if (!computedSources.has(fn)) {
-    const source = createSource({
-      value: undefined
-    })
-
-    createStandaloneAutorun(() => {
-      source.value$ = fn()
-    })
-
-    computedSources.set(fn, source)
-  }
-
-  return computedSources.get(fn).value$
-}
-
-/*******************************************************************************
- *
- * Transaction
- *
- ******************************************************************************/
-
-function makeTransaction (fn) {
-  const parentTransaction = curTransaction
-  curTransaction = { afterEnd: [] }
-  fn()
-  for (const callback of curTransaction.afterEnd) {
-    callback()
-  }
-  curTransaction = parentTransaction
-}
-
-/*******************************************************************************
- *
- * Render
+ * RENDER
  *
  ******************************************************************************/
 
@@ -367,231 +287,77 @@ function render (template) {
     return template
   }
 
-  if (template && template[_isStream_]) {
-    const stream = template
-    // const startNode = document.createTextNode('')
-    // const endNode = document.createTextNode('')
-    // startNode[_isStartNode_] = true
-    // endNode[_isEndNode_] = true
-    // startNode[_nodeId_] = globalNodeId
-    // endNode[_nodeId_] = globalNodeId
-    // globalNodeId += 1
-    const nodes = render(stream.slice())
-    const startNode = nodes[0]
-    const endNode = nodes[nodes.length - 1]
+  if (isStringOrNumber(template)) {
+    return document.createTextNode(template)
+  }
 
-    watchArray(stream, {
-      onAdd (index, item) {
-        let i = 0
-        let cursor = startNode.nextSibling
-        const newNodes = toFlatArray(render(item))
-        let indexElem = null
-
-        while (cursor !== endNode) {
-          if (cursor[_isStartNode_]) {
-            if (i === index) {
-              indexElem = cursor
-              break
-            }
-            const nodeId = cursor[_nodeId_]
-            while (true) {
-              cursor = cursor.nextSibling
-              if (cursor[_isEndNode_] && cursor[_nodeId_] === nodeId) {
-                break
-              }
-            }
-            cursor = cursor.nextSibling
-            i += 1
-          } else {
-            if (i === index) {
-              indexElem = cursor
-              break
-            }
-            cursor = cursor.nextSibling
-            i += 1
-          }
-        }
-
-        if (!indexElem) {
-          indexElem = endNode
-        }
-
-        for (const newNode of newNodes) {
-          indexElem.parentNode.insertBefore(newNode, indexElem)
-        }
-
-        // while (true) {
-        //   if (cursor[_isStartNode_]) {
-        //     while (!cursor[_isEndNode_]) {
-        //       cursor = cursor.nextSibling
-        //     }
-        //   }
-
-        //   cursor = cursor.nextSibling
-
-        //   if (i === index + 1) {
-        //     break
-        //   }
-
-        //   i += 1
-        // }
-
-        // for (const newNode of newNodes) {
-        //   cursor.parentNode.insertBefore(newNode, cursor)
-        // }
-      },
-
-      onRemove (index) {
-        let i = 0
-        let cursor = startNode.nextSibling
-
-        while (cursor !== endNode) {
-          if (cursor[_isStartNode_]) {
-            const nodes = [cursor]
-            const nodeId = cursor[_nodeId_]
-            while (true) {
-              cursor = cursor.nextSibling
-              nodes.push(cursor)
-              if (cursor[_isEndNode_] && cursor[_nodeId_] === nodeId) {
-                break
-              }
-            }
-            cursor = cursor.nextSibling
-            if (i === index) {
-              for (const node of nodes) {
-                removeNode(node)
-              }
-            }
-            i += 1
-          } else {
-            if (i === index) {
-              removeNode(cursor)
-              break
-            }
-            cursor = cursor.nextSibling
-            i += 1
-          }
-        }
-      }
-    })
-
-    return nodes
+  if (isObject(template)) {
+    return renderObject(template)
   }
 
   if (isArray(template)) {
-    const startNode = document.createTextNode('')
-    const endNode = document.createTextNode('')
-    startNode[_isStartNode_] = true
-    endNode[_isEndNode_] = true
-    startNode[_nodeId_] = globalNodeId
-    endNode[_nodeId_] = globalNodeId
-    globalNodeId += 1
-
-    return [
-      startNode,
-      ...toFlatArray(template.map(render)),
-      endNode
-    ]
+    return renderArray(template)
   }
 
   if (isFunction(template)) {
-    const startNode = document.createTextNode('')
-    const endNode = document.createTextNode('')
-    startNode[_isStartNode_] = true
-    endNode[_isEndNode_] = true
-    startNode[_nodeId_] = globalNodeId
-    endNode[_nodeId_] = globalNodeId
-    globalNodeId += 1
-    let nodes
-
-    let isFirstRun = true
-    let a = createAutorun(() => {
-      const newNodes = toFlatArray(render(template()))
-
-      if (isFirstRun) {
-        nodes = newNodes
-        isFirstRun = false
-      } else {
-        const fragment = document.createDocumentFragment()
-        for (const newNode of newNodes) {
-          fragment.appendChild(newNode)
-        }
-
-        if (!startNode.parentNode) {
-          a.stop()
-          return
-        }
-
-        while (startNode.nextSibling !== endNode) {
-          removeNode(startNode.nextSibling)
-        }
-
-        endNode.parentNode.insertBefore(fragment, endNode)
-      }
-    })
-
-    startNode._autorun = a
-
-    return [
-      startNode,
-      ...nodes,
-      endNode
-    ]
+    return renderFunction(template)
   }
 
-  let node
-  const setNode = (value) => {
-    node = value
+  if (isStream(template)) {
+    return renderStream(template)
   }
+
+  return document.createTextNode('')
+}
+
+/*******************************************************************************
+ *
+ * RENDER OBJECT
+ *
+ ******************************************************************************/
+
+function renderObject (template) {
+  // Preprocess with plugins
   const stateByPlugin = new Map()
-
-  for (const plugin of renderPlugins) {
+  for (const plugin of plugins) {
     if (plugin.preprocess) {
       const state = {}
       stateByPlugin.set(plugin, state)
-      plugin.preprocess({ state, template, setNode })
+      plugin.preprocess({ state, template })
     }
   }
 
-  if (node) {
-    return node
+  // Create node
+  let node
+  const tag = template.tag || 'div'
+  if (template.xmlns) {
+    node = document.createElementNS(template.xmlns, tag)
+  } else {
+    node = document.createElement(tag)
   }
 
-  if (isStringOrNumber(template)) {
-    node = document.createTextNode(template)
-  } else if (isObject(template)) {
-    const tag = template.tag || 'div'
-
-    if (template.xmlns) {
-      node = document.createElementNS(template.xmlns, tag)
-    } else {
-      node = document.createElement(tag)
-    }
-
-    for (const key in template) {
-      if (key !== 'tag' && key !== 'inner') {
-        const value = template[key]
-        if (value && value[_isEventHandler_]) {
-          node.addEventListener(key, value)
-        } else if (isFunction(value)) {
-          createAutorun(() => {
-            setAttributeSafe(node, key, value())
-          })
-        } else {
-          setAttributeSafe(node, key, value)
-        }
+  // Set attributes, add event listeners
+  for (const key in template) {
+    if (key !== 'tag' && key !== 'inner') {
+      const value = template[key]
+      if (events.includes(key) && isFunction(value)) {
+        node.addEventListener(key.slice(2), value)
+      } else {
+        autorun(() => {
+          setAttributeSafe(node, key, dynamic(value))
+        })
       }
     }
-
-    const children = toFlatArray(render(template.inner))
-    for (const child of children) {
-      node.appendChild(child)
-    }
-  } else {
-    node = document.createTextNode('')
   }
 
-  for (const plugin of renderPlugins) {
+  // Render children
+  const children = toFlatArray(render(template.inner))
+  for (const child of children) {
+    node.appendChild(child)
+  }
+
+  // Postprocess with plugins
+  for (const plugin of plugins) {
     if (plugin.postprocess) {
       const state = stateByPlugin.get(plugin)
       plugin.postprocess({ state, template, node })
@@ -615,41 +381,205 @@ function setAttributeSafe (elem, key, value) {
 
 /*******************************************************************************
  *
- * Event Handler
+ * RENDER ARRAY
  *
  ******************************************************************************/
 
-function createEventHandler (handler) {
-  handler[_isEventHandler_] = true
-  return handler
+function renderArray (template) {
+  const [startNode, endNode] = createBoundaryNodes()
+  return [
+    startNode,
+    ...toFlatArray(template.map(render)),
+    endNode
+  ]
 }
 
 /*******************************************************************************
  *
- * Render Plugin
+ * RENDER FUNCTION
  *
  ******************************************************************************/
 
-function addRenderPlugin (plugin) {
-  renderPlugins.push(plugin)
+function renderFunction (template) {
+  const [startNode, endNode] = createBoundaryNodes()
+  let nodes
+
+  let isFirstRun = true
+  let a = autorun(() => {
+    const newNodes = toFlatArray(render(template()))
+
+    if (isFirstRun) {
+      nodes = newNodes
+      isFirstRun = false
+    } else {
+      const fragment = document.createDocumentFragment()
+      for (const newNode of newNodes) {
+        fragment.appendChild(newNode)
+      }
+
+      if (!startNode.parentNode) {
+        a.stop()
+        return
+      }
+
+      while (startNode.nextSibling !== endNode) {
+        removeNode(startNode.nextSibling)
+      }
+
+      endNode.parentNode.insertBefore(fragment, endNode)
+    }
+  })
+
+  startNode._autorun = a
+
+  return [
+    startNode,
+    ...nodes,
+    endNode
+  ]
 }
 
 /*******************************************************************************
  *
- * Helpers
+ * RENDER STREAM
  *
  ******************************************************************************/
 
-function watchArray (array, { onAdd, onRemove }) {
-  if (array[_itemAdd_]) {
-    array[_itemAdd_].add(onAdd)
-    array[_itemRemove_].add(onRemove)
+function renderStream (stream) {
+  const nodes = renderArray(stream)
+  const startNode = nodes[0]
+  const endNode = nodes[nodes.length - 1]
 
-    if (curAutorun) {
-      curAutorun.children.push({
+  onSplice(stream, (start, removeCount, ...items) => {
+    let i = 0
+    let cursor = startNode.nextSibling
+    let bid = startNode[_boundaryId_]
+
+    if (!cursor) {
+      console.log('strange')
+      return
+    }
+
+    const children = []
+
+    while (cursor !== endNode) {
+      if (cursor[_boundaryId_]) {
+        const nodes2 = []
+        const boundaryId = cursor[_boundaryId_]
+        while (true) {
+          nodes2.push(cursor)
+          cursor = cursor.nextSibling
+          if (cursor[_boundaryId_] === boundaryId) {
+            nodes2.push(cursor)
+            break
+          }
+        }
+        children.push(nodes2)
+      } else {
+        children.push(cursor)
+      }
+
+      cursor = cursor.nextSibling
+    }
+
+    const nodesToRemove = []
+    const bef = toFlatArray(children[start] || endNode)[0]
+
+    for (i = 0; i < removeCount; i++) {
+      const cc = toFlatArray(children[start + i])
+      for (const c of cc) {
+        nodesToRemove.push(c)
+      }
+    }
+
+    for (const item of items) {
+      const ii = toFlatArray(render(item))
+      for (const i of ii) {
+        bef.parentNode.insertBefore(i, bef)
+      }
+    }
+
+    for (const n of nodesToRemove) {
+      removeNode(n)
+    }
+  })
+
+  return nodes
+}
+
+/*******************************************************************************
+ *
+ * USE RENDER PLUGIN
+ *
+ ******************************************************************************/
+
+function useRenderPlugin (plugin) {
+  plugins.push(plugin)
+}
+
+/*******************************************************************************
+ *
+ * UTILS
+ *
+ ******************************************************************************/
+
+function isStringOrNumber (any) {
+  return typeof any === 'string' || typeof any === 'number'
+}
+
+function isFunction (any) {
+  return typeof any === 'function'
+}
+
+function isObject (any) {
+  return Object.prototype.toString.call(any) === '[object Object]'
+}
+
+function isArray (any) {
+  return Array.isArray(any) && !any[_isStream_]
+}
+
+function isStream (any) {
+  return any && any[_isStream_]
+}
+
+function toFlatArray (any) {
+  return isArray(any) ? flatten(any) : [any]
+}
+
+function flatten (array) {
+  let flat = []
+  for (const item of array) {
+    if (isArray(item)) {
+      flat = flat.concat(flatten(item))
+    } else {
+      flat.push(item)
+    }
+  }
+  return flat
+}
+
+/*******************************************************************************
+ *
+ * UNCATEGORIZED
+ *
+ ******************************************************************************/
+
+function removeNode (node) {
+  if (node._autorun) {
+    node._autorun.stop()
+  }
+  node.remove()
+}
+
+function onSplice (sourceArray, fn) {
+  if (sourceArray[_splice_]) {
+    sourceArray[_splice_].add(fn)
+
+    if (curComp) {
+      curComp[_children_].push({
         stop () {
-          array[_itemAdd_].delete(onAdd)
-          array[_itemRemove_].delete(onRemove)
+          sourceArray[_splice_].delete(fn)
         }
       })
     }
@@ -661,8 +591,8 @@ function callFns (fns, ...args) {
     return
   }
 
-  if (curTransaction) {
-    curTransaction.afterEnd.push(call)
+  if (curStack) {
+    curStack.push(call)
   } else {
     call()
   }
@@ -674,10 +604,25 @@ function callFns (fns, ...args) {
   }
 }
 
-function removeNode (node) {
-  if (node._autorun) {
-    node._autorun.stop()
+function getAllEvents () {
+  const events = []
+  for (const key in document) {
+    const value = events[key]
+    if (key.startsWith('on') && (value === null || isFunction(value))) {
+      events.push(key)
+    }
   }
-  node.remove()
+
+  return events
 }
-})()
+
+function createBoundaryNodes () {
+  const startNode = document.createTextNode('')
+  const endNode = document.createTextNode('')
+  startNode[_boundaryId_] = boundaryIndex
+  endNode[_boundaryId_] = boundaryIndex
+  boundaryIndex += 1
+  return [startNode, endNode]
+}
+
+  })()

@@ -1,11 +1,11 @@
 // TODO: if autorun has zero deps => destroy
-// window.Epos = {
-//   render,
-//   dynamic,
-//   autorun,
-//   transaction,
-//   useRenderPlugin
-// }
+window.Epos = {
+  render,
+  dynamic,
+  autorun,
+  transaction,
+  useRenderPlugin
+}
 
 /*******************************************************************************
  *
@@ -329,7 +329,7 @@ function renderObject (template) {
 
   // Set attributes, add event listeners
   for (const key in template) {
-    if (key !== 'tag' && key !== 'inner') {
+    if (key !== 'tag' && key !== 'inner' && key !== 'xmlns') {
       const value = template[key]
       if (events.includes(key) && isFunction(value)) {
         node.addEventListener(key.slice(2), value)
@@ -421,7 +421,7 @@ function renderFunction (template) {
     }
   })
 
-  startNode._autorun = a
+  // startNode._autorun = a
 
   return [
     startNode,
@@ -444,7 +444,6 @@ function renderStream (stream) {
   onSplice(stream, (start, removeCount, ...items) => {
     let i = 0
     let cursor = startNode.nextSibling
-    let bid = startNode[_boundaryId_]
 
     if (!cursor) {
       console.log('strange')
