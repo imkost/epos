@@ -24,6 +24,7 @@ const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
+const _isStopped_ = Symbol('isStopped')
 const _boundaryId_ = Symbol('boundaryId')
 
 /*******************************************************************************
@@ -169,37 +170,42 @@ function getComputed (fn) {
   // }
 
   if (!fn.source) {
-    fn.children = new Set()
+    fn.usages = 0
     fn.source = createSource({
       value: void 0
     })
 
-    fn.comp = autorun(() => {
+    fn.a = autorun(() => {
       fn.source.value$ = fn()
     }, true)
-
-    // computed.set(fn, source)
   }
 
-  let comp = curComp
-  fn.children.add(comp)
+  fn.usages += 1
 
-  comp[_children_].push({
-    stop () {
-      fn.children.delete(comp)
-      comp.afterRun.push(() => {
-        // console.log('after run');
-        // console.log(fn.children);
-        if (fn.children.size === 0) {
-          fn.comp.stop()
-          fn.source = null
-        }
-      })
-    }
-  })
+  if (curComp) {
+    curComp.onRerun.add(() => {
+      fn.usages -= 1
+      if (fn.usages === 0) {
+        fn.a.stop()
+      }
+    })
+  }
 
+  window.fn = fn
 
-  return fn.source.value$ // computed.get(fn).value$
+  // let needStop = true
+  // window.u = fn.usages
+  // fn.usages.forEach(comp => {
+  //   if (!comp[_isStopped_]) {
+  //     needStop = false
+  //   }
+  // })
+
+  // if (needStop) {
+  //   fn.a.stop()
+  // }
+
+  return fn.source.value$
 }
 
 /*******************************************************************************
@@ -246,7 +252,8 @@ function autorun (fn, isStandalone = false) {
   let deps = []
   const comp = {
     stop,
-    afterRun: [],
+    deps,
+    onRerun: new Set(),
     [_children_]: []
   }
 
@@ -259,7 +266,8 @@ function autorun (fn, isStandalone = false) {
   return comp
 
   function run () {
-    stop()
+    clear()
+    callFns(comp.onRerun)
     const parentGet = curGet
     const parentComp = curComp
     curGet = get
@@ -267,9 +275,6 @@ function autorun (fn, isStandalone = false) {
     fn()
     curGet = parentGet
     curComp = parentComp
-
-    comp.afterRun.forEach(f => f())
-    comp.afterRun = []
   }
 
   function get (change) {
@@ -277,7 +282,7 @@ function autorun (fn, isStandalone = false) {
     deps.push(change)
   }
 
-  function stop () {
+  function clear () {
     for (const child of comp[_children_]) {
       child.stop()
     }
@@ -287,6 +292,12 @@ function autorun (fn, isStandalone = false) {
       change.delete(run)
     }
     deps = []
+    comp.deps = deps
+  }
+
+  function stop () {
+    clear()
+    comp[_isStopped_] = true
   }
 }
 
@@ -357,9 +368,16 @@ function renderObject (template) {
       if (events.includes(key) && isFunction(value)) {
         node.addEventListener(key.slice(2), value)
       } else {
-        autorun(() => {
-          setAttributeSafe(node, key, dynamic(value))
-        })
+        if (isFunction(value)) {
+          autorun(() => {
+            setAttributeSafe(node, key, value())
+          })
+        } else {
+          setAttributeSafe(node, key, value)
+        }
+        // autorun(() => {
+        //   setAttributeSafe(node, key, dynamic(value))
+        // })
       }
     }
   }
@@ -414,12 +432,15 @@ function renderArray (template) {
  *
  ******************************************************************************/
 
+window.z = 0
+
 function renderFunction (template) {
   const [startNode, endNode] = createBoundaryNodes()
   let nodes
 
   let isFirstRun = true
   let a = autorun(() => {
+    window.z = 1
     const newNodes = toFlatArray(render(template()))
 
     if (isFirstRun) {
@@ -442,6 +463,7 @@ function renderFunction (template) {
 
       endNode.parentNode.insertBefore(fragment, endNode)
     }
+    window.z = 0
   })
 
   // startNode._autorun = a

@@ -259,43 +259,79 @@ test('transaction', () => {
 test('stop autoruns for removed elements', () => {
   const store = dynamic({
     title: 'a',
-    shown: true
+    shown: true,
+    shown2: true,
+    number: 4
   })
+
+  const isBig = () => {
+    console.log('run big');
+    return store.number$ > 5
+  }
+
+  window.isBig = isBig
 
   let hrefRuns = 0
   let titleRuns = 0
   const app = render({
-    inner () {
-      if (store.shown$) {
-        return {
-          class: 'wrap',
-          inner: {
-            class: 'title',
-            href () {
-              hrefRuns += 1
-              return store.title$
-            },
-            inner () {
-              titleRuns += 1
-              return store.title$
-            }
-          }
+    inner: [
+      () => {
+        console.log('rerun 1');
+        if (store.shown$) {
+          return dynamic(isBig) ? 'large' : 'small'
         }
+        return '--'
+      },
+      () => {
+        console.log('rerun 2');
+        if (store.shown2$) {
+          return dynamic(isBig) ? 'large' : 'small'
+        }
+        return '--'
       }
-      return 'hidden'
-    }
+    // inner () {
+    //   if (store.shown$) {
+    //     return {
+    //       href () {
+    //         hrefRuns += 1
+    //         return store.title$
+    //       }
+    //       // inner: store.title$
+    //       // inner () {
+    //       //   titleRuns += 1
+    //       //   return store.title$
+    //       // }
+    //     }
+    //   }
+    //   return 'hidden'
+    // }
+    ]
   })
 
-  assert(titleRuns === 1)
+  // dynamic(() => store.title$)
+  // dynamic(() => store.title$)
+  window.store = store
 
-  store.title$ = 'b'
-  assert(titleRuns === 2)
+  // // // assert(titleRuns === 1)
 
+  // // store.title$ = 'b'
+  // // // assert(titleRuns === 2)
+
+  // store.shown$ = false
+  // store.title$ = 'c'
+  // store.title$ = 'd'
+  // console.log(hrefRuns)
+  // // console.log(hrefRuns)
+  document.body.appendChild(app)
+
+  console.log('############### ')
   store.shown$ = false
-  store.title$ = 'c'
-  store.title$ = 'd'
-  console.log(titleRuns)
-  console.log(hrefRuns);
+  store.shown2$ = false
+  store.number$ = 1
+  // store.number$ = 10
+  console.log('############### ')
+  // store.shown2$ = true
+  // store.number$ = 2
 })
 
 // test('complex', () => {
@@ -379,6 +415,8 @@ test('stop autoruns for removed elements', () => {
 // })
 
 function test (what, fn) {
+  fn()
+  return
   try {
     fn()
     console.log('%c+ ' + what, 'color: green')
