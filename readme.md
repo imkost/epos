@@ -9,39 +9,10 @@ Source массив — это обычный массив + мнимые мет
 
 Stream — это source-массив с процессингом и continuous.
 
+stream => continuous?
 
 
-
-
-
-// BASE API:
-// -------
-// dynamic
-// render
-
-// ADVANCED API:
-// -------
-// autorun(fn, isStandalone)
-// transaction(fn)
-// useRenderPlugin({ preprocess, postprocess })
-
-
-// useRenderPlugin(classArray)
-// useRenderPlugin(dataObject)
-// useRenderPlugin(styleObject)
-
-
-// new Map()
-// new Symbol()
-// _isStream_ = new EposSymbol()
-// [] = new EposMap()
-// [] = new EposSet()
-// get(s, _isStream_)
-// get(s, _itemAdd_)
-// createSymbol
-// const stateByPlugin = createMap()
-
-
+```
 // let isSvg = false
 // useRenderPlugin({
 //   preprocess ({ state, template }) {
@@ -158,3 +129,4 @@ window.Epos = {
   addRenderPlugin
 }
 
+```

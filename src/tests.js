@@ -256,7 +256,68 @@ test('transaction', () => {
   assert(app.innerText === 'd')
 })
 
-test('stop autoruns for removed elements', () => {
+testa('stop autoruns for removed elements', () => {
+  const store = dynamic({
+    title: 'a',
+    shown: true,
+    href: 'a'
+  })
+
+  let runs = 0
+  let hrefRuns = 0
+  let titleRuns = 0
+
+  // const hrefComputed = () => {
+  //   hrefRuns += 1
+  //   return store.href$
+  // }
+  // window.hrefComputed = hrefComputed
+
+  const app = render({
+    inner: [
+      () => {
+        runs += 1
+        if (store.shown$) {
+          return {
+            href () {
+              // return dynamic(hrefComputed)
+              hrefRuns += 1
+              return store.href$
+            },
+            inner () {
+              titleRuns += 1
+              return store.title$
+            }
+          }
+        }
+
+        return '-'
+      },
+    ]
+  })
+
+  assert(runs === 1)
+  assert(hrefRuns === 1)
+  assert(titleRuns === 1)
+
+  store.href$ = 'b'
+  assert(runs === 1)
+  assert(hrefRuns === 2)
+  assert(titleRuns === 1)
+
+  store.shown$ = false
+  assert(runs === 2)
+  assert(hrefRuns === 2)
+  assert(titleRuns === 1)
+
+  store.href$ = 'c'
+  assert(runs === 2)
+  assert(hrefRuns === 2)
+
+  assert(titleRuns === 1)
+})
+
+test('stop dynamic when no more deps', () => {
   const store = dynamic({
     title: 'a',
     shown: true,
@@ -264,74 +325,82 @@ test('stop autoruns for removed elements', () => {
     number: 4
   })
 
+  let isBigRuns = 0
   const isBig = () => {
-    console.log('run big');
+    isBigRuns += 1
     return store.number$ > 5
   }
-
   window.isBig = isBig
 
-  let hrefRuns = 0
-  let titleRuns = 0
+  let firstRuns = 0
+  let secondRuns = 0
   const app = render({
     inner: [
       () => {
-        console.log('rerun 1');
+        firstRuns += 1
         if (store.shown$) {
           return dynamic(isBig) ? 'large' : 'small'
         }
         return '--'
       },
       () => {
-        console.log('rerun 2');
+        secondRuns += 1
         if (store.shown2$) {
           return dynamic(isBig) ? 'large' : 'small'
         }
         return '--'
       }
-    // inner () {
-    //   if (store.shown$) {
-    //     return {
-    //       href () {
-    //         hrefRuns += 1
-    //         return store.title$
-    //       }
-    //       // inner: store.title$
-    //       // inner () {
-    //       //   titleRuns += 1
-    //       //   return store.title$
-    //       // }
-    //     }
-    //   }
-    //   return 'hidden'
-    // }
     ]
   })
 
-  // dynamic(() => store.title$)
-  // dynamic(() => store.title$)
-  window.store = store
+  assert(isBigRuns === 1)
+  assert(firstRuns === 1)
+  assert(secondRuns === 1)
 
-  // // // assert(titleRuns === 1)
+  store.number$ = 3
+  assert(isBigRuns === 2)
+  assert(firstRuns === 1)
+  assert(secondRuns === 1)
 
-  // // store.title$ = 'b'
-  // // // assert(titleRuns === 2)
+  store.number$ = 6
+  assert(isBigRuns === 3)
+  assert(firstRuns === 2)
+  assert(secondRuns === 2)
 
-  // store.shown$ = false
-  // store.title$ = 'c'
-  // store.title$ = 'd'
-  // console.log(hrefRuns)
-  // // console.log(hrefRuns)
-  document.body.appendChild(app)
-
-  console.log('############### ')
   store.shown$ = false
+  assert(isBigRuns === 3)
+  assert(firstRuns === 3)
+  assert(secondRuns === 2)
+
+  store.number$ = 2
+  assert(isBigRuns === 4)
+  assert(firstRuns === 3)
+  assert(secondRuns === 3)
+
   store.shown2$ = false
-  store.number$ = 1
-  // store.number$ = 10
-  console.log('############### ')
-  // store.shown2$ = true
-  // store.number$ = 2
+  assert(isBigRuns === 4)
+  assert(firstRuns === 3)
+  assert(secondRuns === 4)
+
+  store.number$ = 10
+  assert(isBigRuns === 4) // no runs for isBig
+  assert(firstRuns === 3)
+  assert(secondRuns === 4)
+
+  store.shown$ = true
+  assert(isBigRuns === 5)
+  assert(firstRuns === 4)
+  assert(secondRuns === 4)
+
+  store.number$ = 6
+  assert(isBigRuns === 6)
+  assert(firstRuns === 4)
+  assert(secondRuns === 4)
+
+  store.number$ = 3
+  assert(isBigRuns === 7)
+  assert(firstRuns === 5)
+  assert(secondRuns === 4)
 })
 
 // test('complex', () => {
@@ -414,9 +483,11 @@ test('stop autoruns for removed elements', () => {
 //   // app.querySelector()
 // })
 
+function testa (what, fn) {
+  test(what, fn)
+}
+
 function test (what, fn) {
-  fn()
-  return
   try {
     fn()
     console.log('%c+ ' + what, 'color: green')

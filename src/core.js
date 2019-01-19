@@ -3,9 +3,10 @@ window.Epos = {
   render,
   dynamic,
   autorun,
-  transaction,
-  useRenderPlugin
+  transaction
 }
+
+render.addPlugin = addRenderPlugin
 
 /*******************************************************************************
  *
@@ -25,6 +26,7 @@ const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
+const allComputedFns = new Set()
 
 /*******************************************************************************
  *
@@ -162,14 +164,10 @@ function createSourceArray (array, parentChange) {
  ******************************************************************************/
 
 function getComputed (fn) {
-  // for (const [key, source] of computed) {
-  //   if (source[_change_].value.size === 0) {
-  //     computed.delete(key)
-  //   }
-  // }
+  allComputedFns.add(fn)
 
   if (!fn.source) {
-    fn.children = new Set()
+    fn.usages = new Set()
     fn.source = createSource({
       value: void 0
     })
@@ -177,29 +175,21 @@ function getComputed (fn) {
     fn.comp = autorun(() => {
       fn.source.value$ = fn()
     }, true)
-
-    // computed.set(fn, source)
   }
 
   let comp = curComp
-  fn.children.add(comp)
+  if (comp) {
+    fn.usages.add(comp)
+    comp[_children_].push({
+      stop () {
+        // TODO: call fnsToCheckAfterAutorun.add(fn)
+        // и дропнуть allComputedFns
+        fn.usages.delete(comp)
+      }
+    })
+  }
 
-  comp[_children_].push({
-    stop () {
-      fn.children.delete(comp)
-      comp.afterRun.push(() => {
-        // console.log('after run');
-        // console.log(fn.children);
-        if (fn.children.size === 0) {
-          fn.comp.stop()
-          fn.source = null
-        }
-      })
-    }
-  })
-
-
-  return fn.source.value$ // computed.get(fn).value$
+  return fn.source.value$
 }
 
 /*******************************************************************************
@@ -245,8 +235,8 @@ function createStream (sourceArray, fn) {
 function autorun (fn, isStandalone = false) {
   let deps = []
   const comp = {
+    fn: fn.toString(),
     stop,
-    afterRun: [],
     [_children_]: []
   }
 
@@ -268,8 +258,14 @@ function autorun (fn, isStandalone = false) {
     curGet = parentGet
     curComp = parentComp
 
-    comp.afterRun.forEach(f => f())
-    comp.afterRun = []
+    if (curComp === null) {
+      allComputedFns.forEach(fn => {
+        if (fn.usages.size === 0) {
+          fn.comp.stop()
+          fn.source = null
+        }
+      })
+    }
   }
 
   function get (change) {
@@ -522,11 +518,11 @@ function renderStream (stream) {
 
 /*******************************************************************************
  *
- * USE RENDER PLUGIN
+ * ADD RENDER PLUGIN
  *
  ******************************************************************************/
 
-function useRenderPlugin (plugin) {
+function addRenderPlugin (plugin) {
   plugins.push(plugin)
 }
 
