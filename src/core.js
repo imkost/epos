@@ -20,11 +20,10 @@ let curStack = null
 let boundaryIndex = 1
 const events = getAllEvents()
 const plugins = []
-const computed = new Map()
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
-const _isStream_ = Symbol('isStream')
+const _isCont_ = Symbol('isCont')
 const _boundaryId_ = Symbol('boundaryId')
 const allComputedFns = new Set()
 
@@ -153,7 +152,7 @@ function createSourceArray (array, parentChange) {
   }
 
   function map$ (fn) {
-    return createStream(source, fn)
+    return createCont(source, fn)
   }
 }
 
@@ -210,20 +209,20 @@ function transaction (fn) {
 
 /*******************************************************************************
  *
- * CREATE STREAM
+ * CREATE CONT
  *
  ******************************************************************************/
 
-function createStream (sourceArray, fn) {
-  const stream = createSource(sourceArray.map(fn))
-  stream[_isStream_] = true
+function createCont (sourceArray, fn) {
+  const cont = createSource(sourceArray.map(fn))
+  cont[_isCont_] = true
 
   onSplice(sourceArray, (start, removeCount, ...items) => {
     items = items.map(i => fn(i))
-    stream.splice$(start, removeCount, ...items)
+    cont.splice$(start, removeCount, ...items)
   })
 
-  return stream
+  return cont
 }
 
 /*******************************************************************************
@@ -313,8 +312,8 @@ function render (template) {
     return renderFunction(template)
   }
 
-  if (isStream(template)) {
-    return renderStream(template)
+  if (isCont(template)) {
+    return renderCont(template)
   }
 
   return document.createTextNode('')
@@ -451,16 +450,16 @@ function renderFunction (template) {
 
 /*******************************************************************************
  *
- * RENDER STREAM
+ * RENDER CONT
  *
  ******************************************************************************/
 
-function renderStream (stream) {
-  const nodes = renderArray(stream)
+function renderCont (cont) {
+  const nodes = renderArray(cont)
   const startNode = nodes[0]
   const endNode = nodes[nodes.length - 1]
 
-  onSplice(stream, (start, removeCount, ...items) => {
+  onSplice(cont, (start, removeCount, ...items) => {
     let i = 0
     let cursor = startNode.nextSibling
 
@@ -545,11 +544,11 @@ function isObject (any) {
 }
 
 function isArray (any) {
-  return Array.isArray(any) && !any[_isStream_]
+  return Array.isArray(any) && !any[_isCont_]
 }
 
-function isStream (any) {
-  return any && any[_isStream_]
+function isCont (any) {
+  return any && any[_isCont_]
 }
 
 function toFlatArray (any) {
