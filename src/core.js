@@ -19,10 +19,11 @@ let curStack = null
 let boundaryIndex = 1
 const events = getAllEvents()
 const plugins = []
+const computed = new Map()
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
-const _isContinuous_ = Symbol('isContinuous')
+const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
 const allComputedFns = new Set()
 const fnsToCheckAfterAutorun = new Set()
@@ -152,7 +153,7 @@ function createSourceArray (array, parentChange) {
   }
 
   function map$ (fn) {
-    return createContinuous(source, fn)
+    return createStream(source, fn)
   }
 }
 
@@ -210,20 +211,20 @@ function transaction (fn) {
 
 /*******************************************************************************
  *
- * CREATE CONTINUOUS
+ * CREATE STREAM
  *
  ******************************************************************************/
 
-function createContinuous (sourceArray, fn) {
-  const continuous = createSource(sourceArray.map(fn))
-  continuous[_isContinuous_] = true
+function createStream (sourceArray, fn) {
+  const stream = createSource(sourceArray.map(fn))
+  stream[_isStream_] = true
 
   onSplice(sourceArray, (start, removeCount, ...items) => {
     items = items.map(i => fn(i))
-    continuous.splice$(start, removeCount, ...items)
+    stream.splice$(start, removeCount, ...items)
   })
 
-  return continuous
+  return stream
 }
 
 /*******************************************************************************
@@ -313,8 +314,8 @@ function render (template) {
     return renderFunction(template)
   }
 
-  if (isContinuous(template)) {
-    return renderContinuous(template)
+  if (isStream(template)) {
+    return renderStream(template)
   }
 
   return document.createTextNode('')
@@ -451,16 +452,16 @@ function renderFunction (template) {
 
 /*******************************************************************************
  *
- * RENDER CONTINUOUS
+ * RENDER STREAM
  *
  ******************************************************************************/
 
-function renderContinuous (continuous) {
-  const nodes = renderArray(continuous)
+function renderStream (stream) {
+  const nodes = renderArray(stream)
   const startNode = nodes[0]
   const endNode = nodes[nodes.length - 1]
 
-  onSplice(continuous, (start, removeCount, ...items) => {
+  onSplice(stream, (start, removeCount, ...items) => {
     let i = 0
     let cursor = startNode.nextSibling
 
@@ -557,11 +558,11 @@ function isObject (any) {
 }
 
 function isArray (any) {
-  return Array.isArray(any) && !any[_isContinuous_]
+  return Array.isArray(any) && !any[_isStream_]
 }
 
-function isContinuous (any) {
-  return any && any[_isContinuous_]
+function isStream (any) {
+  return any && any[_isStream_]
 }
 
 function toFlatArray (any) {
