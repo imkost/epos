@@ -1,4 +1,3 @@
-// TODO: if autorun has zero deps => destroy
 window.Epos = {
   render,
   dynamic,
@@ -23,9 +22,10 @@ const plugins = []
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
-const _isCont_ = Symbol('isCont')
+const _isContinuous_ = Symbol('isContinuous')
 const _boundaryId_ = Symbol('boundaryId')
 const allComputedFns = new Set()
+const fnsToCheckAfterAutorun = new Set()
 
 /*******************************************************************************
  *
@@ -152,7 +152,7 @@ function createSourceArray (array, parentChange) {
   }
 
   function map$ (fn) {
-    return createCont(source, fn)
+    return createContinuous(source, fn)
   }
 }
 
@@ -163,7 +163,7 @@ function createSourceArray (array, parentChange) {
  ******************************************************************************/
 
 function getComputed (fn) {
-  allComputedFns.add(fn)
+  // allComputedFns.add(fn)
 
   if (!fn.source) {
     fn.usages = new Set()
@@ -181,6 +181,7 @@ function getComputed (fn) {
     fn.usages.add(comp)
     comp[_children_].push({
       stop () {
+        fnsToCheckAfterAutorun.add(fn)
         // TODO: call fnsToCheckAfterAutorun.add(fn)
         // и дропнуть allComputedFns
         fn.usages.delete(comp)
@@ -209,20 +210,20 @@ function transaction (fn) {
 
 /*******************************************************************************
  *
- * CREATE CONT
+ * CREATE CONTINUOUS
  *
  ******************************************************************************/
 
-function createCont (sourceArray, fn) {
-  const cont = createSource(sourceArray.map(fn))
-  cont[_isCont_] = true
+function createContinuous (sourceArray, fn) {
+  const continuous = createSource(sourceArray.map(fn))
+  continuous[_isContinuous_] = true
 
   onSplice(sourceArray, (start, removeCount, ...items) => {
     items = items.map(i => fn(i))
-    cont.splice$(start, removeCount, ...items)
+    continuous.splice$(start, removeCount, ...items)
   })
 
-  return cont
+  return continuous
 }
 
 /*******************************************************************************
@@ -258,7 +259,7 @@ function autorun (fn, isStandalone = false) {
     curComp = parentComp
 
     if (curComp === null) {
-      allComputedFns.forEach(fn => {
+      fnsToCheckAfterAutorun.forEach(fn => {
         if (fn.usages.size === 0) {
           fn.comp.stop()
           fn.source = null
@@ -312,8 +313,8 @@ function render (template) {
     return renderFunction(template)
   }
 
-  if (isCont(template)) {
-    return renderCont(template)
+  if (isContinuous(template)) {
+    return renderContinuous(template)
   }
 
   return document.createTextNode('')
@@ -450,16 +451,16 @@ function renderFunction (template) {
 
 /*******************************************************************************
  *
- * RENDER CONT
+ * RENDER CONTINUOUS
  *
  ******************************************************************************/
 
-function renderCont (cont) {
-  const nodes = renderArray(cont)
+function renderContinuous (continuous) {
+  const nodes = renderArray(continuous)
   const startNode = nodes[0]
   const endNode = nodes[nodes.length - 1]
 
-  onSplice(cont, (start, removeCount, ...items) => {
+  onSplice(continuous, (start, removeCount, ...items) => {
     let i = 0
     let cursor = startNode.nextSibling
 
@@ -527,6 +528,18 @@ function addRenderPlugin (plugin) {
 
 /*******************************************************************************
  *
+ * RAW
+ *
+ ******************************************************************************/
+
+function raw (string) {
+  const div = render({})
+  div.innerHTML = string
+  return Array.from(div.childNodes)
+}
+
+/*******************************************************************************
+ *
  * UTILS
  *
  ******************************************************************************/
@@ -544,11 +557,11 @@ function isObject (any) {
 }
 
 function isArray (any) {
-  return Array.isArray(any) && !any[_isCont_]
+  return Array.isArray(any) && !any[_isContinuous_]
 }
 
-function isCont (any) {
-  return any && any[_isCont_]
+function isContinuous (any) {
+  return any && any[_isContinuous_]
 }
 
 function toFlatArray (any) {
