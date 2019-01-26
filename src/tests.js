@@ -403,6 +403,62 @@ test('stop dynamic when no more deps', () => {
   assert(secondRuns === 4)
 })
 
+test('getComputed several times', () => {
+  const store = dynamic({
+    shown: true,
+    number: 5
+  })
+
+  let isLargeRuns = 0
+  const isLarge = () => {
+    isLargeRuns += 1
+    return store.number$ > 10
+  }
+
+  let isShownRuns = 0
+  const isShown = () => {
+    isShownRuns += 1
+    return store.shown$ === true
+  }
+
+  let runs = 0
+  const app = render({
+    inner () {
+      runs += 1
+
+      if (dynamic(isShown)) {
+        const first = dynamic(isLarge) ? 'l' : 's'
+        const second = dynamic(isLarge) ? 'a' : 'm'
+        return first + second
+      }
+
+      return 'none'
+    }
+  })
+
+  assert(runs === 1)
+  assert(isLargeRuns === 1)
+  assert(isShownRuns === 1)
+  assert(app.innerText === 'sm')
+
+  store.number$ = 12
+  assert(runs === 2)
+  assert(isLargeRuns === 2)
+  assert(isShownRuns === 1)
+  assert(app.innerText === 'la')
+
+  store.shown$ = false
+  assert(runs === 3)
+  assert(isLargeRuns === 2)
+  assert(isShownRuns === 2)
+  assert(app.innerText === 'none')
+
+  store.number$ = 2
+  assert(runs === 3)
+  assert(isLargeRuns === 2)
+  assert(isShownRuns === 2)
+})
+
 // test('complex', () => {
 //   const store = dynamic({
 //     show: true,

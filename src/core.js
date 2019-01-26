@@ -163,7 +163,7 @@ function createSourceArray (array, parentChange) {
 
 function getComputed (fn) {
   if (!fn.source) {
-    fn.usages = new Set()
+    fn.usages = 0
     fn.source = createSource({
       value: void 0
     })
@@ -175,11 +175,11 @@ function getComputed (fn) {
 
   let comp = curComp
   if (comp) {
-    fn.usages.add(comp)
+    fn.usages += 1
     comp[_children_].push({
       stop () {
         fnsToCheckAfterAutorun.add(fn)
-        fn.usages.delete(comp)
+        fn.usages -= 1
       }
     })
   }
@@ -255,7 +255,7 @@ function autorun (fn, isStandalone = false) {
 
     if (curComp === null) {
       fnsToCheckAfterAutorun.forEach(fn => {
-        if (fn.usages.size === 0) {
+        if (fn.usages === 0) {
           fn.comp.stop()
           fn.source = null
         }
