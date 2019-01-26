@@ -25,6 +25,9 @@ const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
+const _usages_ = Symbol('usages')
+const _source_ = Symbol('source')
+const _comp_ = Symbol('comp')
 
 /*******************************************************************************
  *
@@ -162,29 +165,29 @@ function createSourceArray (array, parentChange) {
  ******************************************************************************/
 
 function getComputed (fn) {
-  if (!fn.source) {
-    fn.usages = 0
-    fn.source = createSource({
+  if (!fn[_source_]) {
+    fn[_usages_] = 0
+    fn[_source_] = createSource({
       value: void 0
     })
 
-    fn.comp = autorun(() => {
-      fn.source.value$ = fn()
+    fn[_comp_] = autorun(() => {
+      fn[_source_].value$ = fn()
     }, true)
   }
 
   let comp = curComp
   if (comp) {
-    fn.usages += 1
+    fn[_usages_] += 1
     comp[_children_].push({
       stop () {
         fnsToCheckAfterAutorun.add(fn)
-        fn.usages -= 1
+        fn[_usages_] -= 1
       }
     })
   }
 
-  return fn.source.value$
+  return fn[_source_].value$
 }
 
 /*******************************************************************************
@@ -230,7 +233,6 @@ function createStream (sourceArray, fn) {
 function autorun (fn, isStandalone = false) {
   let deps = []
   const comp = {
-    fn: fn.toString(),
     stop,
     [_children_]: []
   }
@@ -255,9 +257,9 @@ function autorun (fn, isStandalone = false) {
 
     if (curComp === null) {
       fnsToCheckAfterAutorun.forEach(fn => {
-        if (fn.usages === 0) {
-          fn.comp.stop()
-          fn.source = null
+        if (fn[_usages_] === 0) {
+          fn[_comp_].stop()
+          fn[_source_] = null
         }
       })
     }
