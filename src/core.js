@@ -19,14 +19,12 @@ let curStack = null
 let boundaryIndex = 1
 const events = getAllEvents()
 const plugins = []
-const computed = new Map()
+const fnsToCheckAfterAutorun = new Set()
 const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
-const allComputedFns = new Set()
-const fnsToCheckAfterAutorun = new Set()
 
 /*******************************************************************************
  *
@@ -164,8 +162,6 @@ function createSourceArray (array, parentChange) {
  ******************************************************************************/
 
 function getComputed (fn) {
-  // allComputedFns.add(fn)
-
   if (!fn.source) {
     fn.usages = new Set()
     fn.source = createSource({
@@ -183,8 +179,6 @@ function getComputed (fn) {
     comp[_children_].push({
       stop () {
         fnsToCheckAfterAutorun.add(fn)
-        // TODO: call fnsToCheckAfterAutorun.add(fn)
-        // и дропнуть allComputedFns
         fn.usages.delete(comp)
       }
     })
