@@ -459,85 +459,138 @@ test('getComputed several times', () => {
   assert(isShownRuns === 2)
 })
 
-// test('complex', () => {
-//   const store = dynamic({
-//     show: true,
-//     items: ['a', 'b', 'c'],
-//     numbers: [
-//       { v: 1 }
-//     ]
-//   })
+test('discontinue', () => {
+  const store = dynamic({
+    show: false,
+    title: 'a'
+  })
 
-//   const strings = store.numbers.map$(number => {
-//     return `_${number.v}_`
-//   })
+  let titleRuns = 0
+  let tooltip
+  const comp = autorun(() => {
+    tooltip = render({
+      class: 'tooltip',
+      inner () {
+        titleRuns += 1
+        return store.title$
+      }
+    })
+  })
 
-//   const uppered = store.items.map$(item => {
-//     return item.toUpperCase()
-//   })
+  const app = render({
+    inner: tooltip
+  })
 
-//   const app = render({
-//     class: 'app',
-//     inner: [
-//       {
-//         class: 'strings',
-//         inner: strings.map$(string => {
-//           return string
-//         })
-//       },
+  assert(titleRuns === 1)
 
-//       () => {
-//         if (store.show$) {
-//           return uppered.map$(item => {
-//             return item + '-'
-//           })
-//         }
+  app.innerHTML = ''
+  store.title$ = 'b'
+  assert(titleRuns === 2)
 
-//         return {
-//           tag: 'i',
-//           inner: 'nothing'
-//         }
-//       },
+  document.body.appendChild(tooltip)
+  tooltip.remove()
+  store.title$ = 'c'
+  assert(titleRuns === 3)
 
-//       {
-//         inner: store.items.map$(char => {
-//           return [
-//             {
-//               tag: 'h2',
-//               inner: char.toUpperCase()
-//             },
-//             store.numbers.map$(number => {
-//               return () => {
-//                 if (store.show$) {
-//                   return [
-//                     {
-//                       class: 'a',
-//                       inner: store.items.map$(char => {
-//                         return char.toUpperCase() + '-'
-//                       })
-//                     }
-//                   ]
-//                 }
-//                 return {
-//                   inner: 'not shown'
-//                 }
-//               }
-//             })
-//           ]
-//         })
-//       }
-//     ]
-//   })
+  discontinue(tooltip)
+  comp.stop()
+  store.title$ = 'd'
+  assert(titleRuns === 3)
+})
 
-//   store.numbers.push$({ v: 7 })
-//   store.items.push$('g')
-//   store.items.splice$(1, 1, 'fa')
-//   store.numbers.shift$()
+test('complex', () => {
+  const store = dynamic({
+    show: true,
+    items: ['a', 'b', 'c'],
+    numbers: [
+      { v: 1 }
+    ]
+  })
 
-//   window.app = app
-//   document.body.appendChild(app)
-//   // app.querySelector()
-// })
+  const strings = store.numbers.map$(number => {
+    return `${number.v}:`
+  })
+
+  const uppered = store.items.map$(item => {
+    return item.toUpperCase()
+  })
+
+  const app = render({
+    class: 'app',
+    inner: [
+      {
+        class: 'strings',
+        inner: strings.map$(string => {
+          return string
+        })
+      },
+
+      () => {
+        if (store.show$) {
+          return uppered.map$(item => {
+            return `${item}-`
+          })
+        }
+
+        return {
+          tag: 'i',
+          inner: 'nothing'
+        }
+      },
+
+      {
+        inner: store.items.map$(char => {
+          return [
+            {
+              tag: 'h2',
+              inner: char.toUpperCase()
+            },
+            store.numbers.map$(number => {
+              return () => {
+                if (store.show$) {
+                  return [
+                    {
+                      class: 'a',
+                      inner: store.items.map$(char => {
+                        return char.toUpperCase() + '-'
+                      })
+                    }
+                  ]
+                }
+                return {
+                  inner: 'not shown'
+                }
+              }
+            })
+          ]
+        })
+      }
+    ]
+  })
+
+  assert(app.querySelector('.strings').innerHTML === '1:')
+
+  store.numbers.push$({ v: 7 })
+  assert(app.querySelector('.strings').innerHTML === '1:7:')
+  assert(app.querySelectorAll('.a').length === 6)
+
+  store.items.push$('g')
+  assert(app.querySelector('.a').innerHTML === 'A-B-C-G-')
+  assert(app.innerText.startsWith('1:7:A-B-C-G-'))
+
+  store.items.splice$(1, 1, 'fa')
+  store.numbers.shift$()
+  assert(app.querySelector('.strings').innerHTML === '7:')
+  assert(app.innerText.startsWith('7:A-FA-C-G-'))
+  assert(app.querySelectorAll('.a').length === 4)
+
+  store.items.unshift$('b')
+  assert(app.querySelectorAll('.a').length === 5)
+  assert(app.innerText.startsWith('7:B-A-FA-C-G-'))
+
+  document.body.appendChild(app)
+  // app.querySelector()
+})
 
 function testa (what, fn) {
   test(what, fn)

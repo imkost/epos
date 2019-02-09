@@ -1,8 +1,20 @@
+// TODO:
+// если вручную удалить элемент elem.remove() или elem.outerHTML = '',
+// то он удалится из дома, в памяти он все еще будет жить, если до него есть ссылка.
+// поэтому правильно, чтобы на нем вся динамичность продолжала выполняться.
+// если мы хотим убить всю динамичность, то нужно вызвать какой-то метод
+
+// TODO:
+// всюду где используются `.remove()` надо кажется останавливать реактивности внутри
+// или все уже останавливается?
+
 window.Epos = {
-  render,
   dynamic,
   autorun,
-  transaction
+  transaction,
+  render,
+  raw,
+  discontinue
 }
 
 render.addPlugin = addRenderPlugin
@@ -16,11 +28,10 @@ render.addPlugin = addRenderPlugin
 let curGet = null
 let curComp = null
 let curStack = null
-let boundaryIndex = 1
+let boundaryId = 1
 const events = getAllEvents()
 const plugins = []
 const fnsToCheckAfterAutorun = new Set()
-const _change_ = Symbol('change')
 const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
@@ -69,12 +80,10 @@ function createSource (any, parentChange) {
 
 function createSourceObject (object) {
   const source = {}
-  source[_change_] = {}
 
   for (const key in object) {
     const value = object[key]
     const change = new Set()
-    source[_change_][key] = change
     source[key] = createSource(value, change)
 
     Object.defineProperty(source, `${key}$`, {
@@ -165,6 +174,10 @@ function createSourceArray (array, parentChange) {
  ******************************************************************************/
 
 function getComputed (fn) {
+  if (!isFunction(fn)) {
+    return fn
+  }
+
   if (!fn[_source_]) {
     fn[_usages_] = 0
     fn[_source_] = createSource({
@@ -176,10 +189,9 @@ function getComputed (fn) {
     }, true)
   }
 
-  let comp = curComp
-  if (comp) {
+  if (curComp) {
     fn[_usages_] += 1
-    comp[_children_].push({
+    curComp[_children_].push({
       stop () {
         fnsToCheckAfterAutorun.add(fn)
         fn[_usages_] -= 1
@@ -230,6 +242,7 @@ function createStream (sourceArray, fn) {
  *
  ******************************************************************************/
 
+// TODO: check if implementation via class can give some performance boost
 function autorun (fn, isStandalone = false) {
   let deps = []
   const comp = {
@@ -256,6 +269,8 @@ function autorun (fn, isStandalone = false) {
     curComp = parentComp
 
     if (curComp === null) {
+      // afterAutorun()
+
       fnsToCheckAfterAutorun.forEach(fn => {
         if (fn[_usages_] === 0) {
           fn[_comp_].stop()
@@ -351,7 +366,7 @@ function renderObject (template) {
         node.addEventListener(key.slice(2), value)
       } else {
         autorun(() => {
-          setAttributeSafe(node, key, dynamic(value))
+          setAttributeSafe(node, key, getComputed(value))
         })
       }
     }
@@ -412,32 +427,28 @@ function renderFunction (template) {
   let nodes
 
   let isFirstRun = true
-  let a = autorun(() => {
+  autorun(() => {
     const newNodes = toFlatArray(render(template()))
 
     if (isFirstRun) {
       nodes = newNodes
       isFirstRun = false
     } else {
+      // Create fragment with all new nodes
       const fragment = document.createDocumentFragment()
       for (const newNode of newNodes) {
         fragment.appendChild(newNode)
       }
 
-      if (!startNode.parentNode) {
-        a.stop()
-        return
-      }
-
+      // Remove all nodes between `start` and `end`
       while (startNode.nextSibling !== endNode) {
-        removeNode(startNode.nextSibling)
+        startNode.nextSibling.remove()
       }
 
+      // Insert fragment between `start` and `end`
       endNode.parentNode.insertBefore(fragment, endNode)
     }
   })
-
-  // startNode._autorun = a
 
   return [
     startNode,
@@ -462,6 +473,7 @@ function renderStream (stream) {
     let cursor = startNode.nextSibling
 
     if (!cursor) {
+      // probably rerun of already removed elements
       console.log('strange')
       return
     }
@@ -506,7 +518,7 @@ function renderStream (stream) {
     }
 
     for (const n of nodesToRemove) {
-      removeNode(n)
+      n.remove()
     }
   })
 
@@ -537,6 +549,16 @@ function raw (string) {
 
 /*******************************************************************************
  *
+ * DISCONTINUE
+ *
+ ******************************************************************************/
+
+// stops all dynamic computation for the given element
+function discontinue (node) {
+}
+
+/*******************************************************************************
+ *
  * UTILS
  *
  ******************************************************************************/
@@ -562,19 +584,7 @@ function isStream (any) {
 }
 
 function toFlatArray (any) {
-  return isArray(any) ? flatten(any) : [any]
-}
-
-function flatten (array) {
-  let flat = []
-  for (const item of array) {
-    if (isArray(item)) {
-      flat = flat.concat(flatten(item))
-    } else {
-      flat.push(item)
-    }
-  }
-  return flat
+  return isArray(any) ? any.flat() : [any]
 }
 
 /*******************************************************************************
@@ -584,10 +594,8 @@ function flatten (array) {
  ******************************************************************************/
 
 function removeNode (node) {
-  if (node._autorun) {
-    node._autorun.stop()
-  }
-  node.remove()
+  // node.remove()
+  // discontinue(node)
 }
 
 function onSplice (sourceArray, fn) {
@@ -625,7 +633,7 @@ function callFns (fns, ...args) {
 function getAllEvents () {
   const events = []
   for (const key in document) {
-    const value = events[key]
+    const value = document[key]
     if (key.startsWith('on') && (value === null || isFunction(value))) {
       events.push(key)
     }
@@ -637,8 +645,8 @@ function getAllEvents () {
 function createBoundaryNodes () {
   const startNode = document.createTextNode('')
   const endNode = document.createTextNode('')
-  startNode[_boundaryId_] = boundaryIndex
-  endNode[_boundaryId_] = boundaryIndex
-  boundaryIndex += 1
+  startNode[_boundaryId_] = boundaryId
+  endNode[_boundaryId_] = boundaryId
+  boundaryId += 1
   return [startNode, endNode]
 }

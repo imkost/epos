@@ -13,22 +13,6 @@ stream => continuous?
 
 
 ```
-// let isSvg = false
-// useRenderPlugin({
-//   preprocess ({ state, template }) {
-//     if (template.tag === 'svg') {
-//       isSvg = true
-//     }
-//     if (isSvg) {
-//       template.xmlns = 'http://www.w3.org/2000/svg'
-//     }
-//   },
-//   postprocess () {
-//     if (isSvg) {
-//       isSvg = false
-//     }
-//   }
-// })
 
 // useRenderPlugin({
 //   preprocess ({ state, template }) {
@@ -74,8 +58,6 @@ stream => continuous?
 // useRenderPlugin(dataObject)
 // useRenderPlugin(styleObject)
 // useRenderPlugin(camelCase)
-// useRenderPlugin(rawCode)
-// useRenderPlugin(svgSupport)
 // useRenderPlugin(mountUnmount)
 // useRenderPlugin()
 
