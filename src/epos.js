@@ -383,12 +383,16 @@ function createStream (sourceArray, fn) {
  * TODO: проверить, может реализация через класс добавит производительности
  */
 function autorun (fn, isStandalone = false) {
+  // Тут хранятся change-наборы зависимых переменных
   let deps = []
+
   const comp = {
     stop,
     [_children_]: []
   }
 
+  // Если есть родительский computation и autorun не в standalone-режиме,
+  // то прописываем себя в дети родителя
   if (curComp && !isStandalone) {
     curComp[_children_].push(comp)
   }
@@ -408,7 +412,7 @@ function autorun (fn, isStandalone = false) {
     curGet = get
     curComp = comp
 
-    // Вызываем функцию в своем текущем скоупе
+    // Вызываем функцию в текущем скоупе
     fn()
 
     // Возвращаемся в родительский скоуп
@@ -574,18 +578,18 @@ function renderFunction (template) {
       nodes = newNodes
       isFirstRun = false
     } else {
-      // Create fragment with all new nodes
+      // Создаем фрагмент со всеми новыми нодами
       const fragment = document.createDocumentFragment()
       for (const newNode of newNodes) {
         fragment.appendChild(newNode)
       }
 
-      // Remove all nodes between `start` and `end`
+      // Удаляем все ноды между start и end
       while (startNode.nextSibling !== endNode) {
         startNode.nextSibling.remove()
       }
 
-      // Insert fragment between `start` and `end`
+      // Вставляем фрагмент между start и end
       endNode.parentNode.insertBefore(fragment, endNode)
     }
   })
@@ -605,6 +609,7 @@ function renderStream (stream) {
   const startNode = nodes[0]
   const endNode = nodes[nodes.length - 1]
 
+  // TODO: порефакторить все, что внутри
   onSplice(stream, (start, removeCount, ...items) => {
     let i = 0
     let cursor = startNode.nextSibling
@@ -658,8 +663,6 @@ function renderStream (stream) {
       n.remove()
     }
   })
-
-  startNode.was = nodes
 
   return nodes
 }
