@@ -698,11 +698,16 @@ function removeNode (node) {
   // discontinue(node)
 }
 
+/**
+ * Навешивает splice-слушатель на переданный sourceArray
+ */
 function onSplice (sourceArray, fn) {
   if (sourceArray[_splice_]) {
     sourceArray[_splice_].add(fn)
 
+    // Если мы внутри computation-а, ...
     if (curComp) {
+      // ... то при его остановке перестаем слушать сплайс
       onStop(curComp, () => {
         sourceArray[_splice_].delete(fn)
       })
@@ -710,6 +715,10 @@ function onSplice (sourceArray, fn) {
   }
 }
 
+/**
+ * Вызывает все переданные функции с переданными аргументами одну за другой,
+ * но если мы внутри транзакции, то кладет вызовы в стэк
+ */
 function callFnsStack (fns, ...args) {
   if (!fns) {
     return
@@ -726,6 +735,9 @@ function callFnsStack (fns, ...args) {
   }
 }
 
+/**
+ * Просто вызывает все переданные функции с переданными аргументами
+ */
 function callFns (fns, ...args) {
   for (const fn of Array.from(fns)) {
     fn(...args)
