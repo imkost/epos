@@ -256,7 +256,7 @@ test('transaction', () => {
   assert(app.innerText === 'd')
 })
 
-testa('stop autoruns for removed elements', () => {
+test('stop autoruns for removed elements', () => {
   const store = dynamic({
     title: 'a',
     shown: true,
@@ -590,6 +590,54 @@ test('complex', () => {
 
   document.body.appendChild(app)
   // app.querySelector()
+})
+
+test('multiple reactive usages of same variable', () => {
+  const store = dynamic({
+    title: 'a'
+  })
+
+  let innerRuns = 0
+  const app = render({
+    inner () {
+      innerRuns += 1
+      return store.title$ + store.title$
+    }
+  })
+
+  assert(innerRuns === 1)
+  store.title$ = 'b'
+  assert(innerRuns === 2)
+})
+
+test('change of splices array', () => {
+  const store = dynamic({
+    posts: [
+      {title: 'a'},
+      {title: 'b'}
+    ]
+  })
+
+  let innerRuns = 0
+  const app = render({
+    inner () {
+      innerRuns += 1
+      if (!store.posts$) {
+        return 'none'
+      }
+
+      return store.posts$.filter(p => p.title$ === 'a').map(p => {
+        return p.title$
+      })
+    }
+  })
+
+  assert(app.innerText === 'a')
+  assert(innerRuns === 1)
+
+  store.posts.push$({title: 'a'})
+  assert(app.innerText === 'aa')
+  assert(innerRuns === 2)
 })
 
 function testa (what, fn) {

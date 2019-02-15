@@ -55,8 +55,8 @@ window.Epos = {
 
 render.addPlugin = addRenderPlugin
 
-// VARS
-// -----------------------------------------------------------------------------
+/* VARS
+---------------------------------------------*/
 
 // Функция, которая срабатывает на реактивный get переменной
 let curGet = null
@@ -93,8 +93,8 @@ const _source_ = Symbol('source')
 const _splice_ = Symbol('splice')
 const _usages_ = Symbol('usages')
 
-// DYNAMIC
-// -----------------------------------------------------------------------------
+/* DYNAMIC
+---------------------------------------------*/
 
 /**
  * Имеет два различных поведения:
@@ -109,8 +109,8 @@ function dynamic (any) {
   return createSource(any)
 }
 
-// CREATE SOURCE
-// -----------------------------------------------------------------------------
+/* CREATE SOURCE
+---------------------------------------------*/
 
 /**
  * Источник из объекта — это обычный объект, но с динамичными полями
@@ -136,8 +136,8 @@ function createSource (any, parentChange) {
   return any
 }
 
-// CREATE SOURCE OBJECT
-// -----------------------------------------------------------------------------
+/* CREATE SOURCE OBJECT
+---------------------------------------------*/
 
 function createSourceObject (object) {
   const source = {}
@@ -174,8 +174,8 @@ function createSourceObject (object) {
   return source
 }
 
-// CREATE SOURCE ARRAY
-// -----------------------------------------------------------------------------
+/* CREATE SOURCE ARRAY
+---------------------------------------------*/
 
 function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
@@ -251,12 +251,31 @@ function createSourceArray (array, parentChange) {
     // Вызываем "слушателей" сплайса
     callFnsStack(source[_splice_], start, removeCount, ...items)
 
+    // Для реактивности считаем, что сплайс изменяет переменную
+    // (на самом деле ссылка не меняется), поэтому вызываем `parentChange`
+    if (parentChange) {
+      callFnsStack(parentChange)
+    }
+
     return removed
   }
 }
 
-// GET COMPUTED
-// -----------------------------------------------------------------------------
+/* CALL OR GET
+---------------------------------------------*/
+
+// TODO: добавить ее в api?
+function callOrGet (value) {
+  if (isFunction(value)) {
+    return value()
+  }
+
+  return value
+}
+
+
+/* GET COMPUTED
+---------------------------------------------*/
 
 function getComputed (any) {
   if (!isFunction(any)) {
@@ -306,10 +325,10 @@ function getComputed (any) {
 
           // Обнуляем source
           fn[_source_] = null
-
-          // И перестаем проверять использования
-          afterRun.delete(checkUsages)
         }
+
+        // Перестаем проверять использования
+        afterRun.delete(checkUsages)
       }
     })
   }
@@ -320,8 +339,8 @@ function getComputed (any) {
   return fn[_source_].value$
 }
 
-// TRANSACTION
-// -----------------------------------------------------------------------------
+/* TRANSACTION
+---------------------------------------------*/
 
 function transaction (fn) {
   // Сохраняем родительский стэк
@@ -342,8 +361,8 @@ function transaction (fn) {
   curStack = parentStack
 }
 
-// CREATE STREAM
-// -----------------------------------------------------------------------------
+/* CREATE STREAM
+---------------------------------------------*/
 
 // TODO: подумать над реактивным индексом
 // возможно что-то вроде dynamic(i) или i.value$
@@ -366,8 +385,8 @@ function createStream (sourceArray, fn) {
   return stream
 }
 
-// AUTHORUN
-// -----------------------------------------------------------------------------
+/* AUTHORUN
+---------------------------------------------*/
 
 /**
  * Самая сложная для понимания часть библиотеки. Все реактивные вещи —
@@ -384,7 +403,7 @@ function createStream (sourceArray, fn) {
  */
 function autorun (fn, isStandalone = false) {
   // Тут хранятся change-наборы зависимых переменных
-  let deps = []
+  let deps = new Set()
 
   const comp = {
     stop,
@@ -430,7 +449,7 @@ function autorun (fn, isStandalone = false) {
   function get (change) {
     // Добавляем зависимость
     change.add(run)
-    deps.push(change)
+    deps.add(change)
   }
 
   function stop () {
@@ -441,15 +460,15 @@ function autorun (fn, isStandalone = false) {
     comp[_children_] = []
 
     // Удаляем все связанные зависимости
-    for (const change of deps) {
+    for (const change of Array.from(deps)) {
       change.delete(run)
     }
-    deps = []
+    deps.clear()
   }
 }
 
-// RENDER
-// -----------------------------------------------------------------------------
+/* RENDER
+---------------------------------------------*/
 
 function render (template) {
   if (template instanceof window.Node) {
@@ -479,8 +498,8 @@ function render (template) {
   return document.createTextNode('')
 }
 
-// RENDER OBJECT
-// -----------------------------------------------------------------------------
+/* RENDER OBJECT
+---------------------------------------------*/
 
 function renderObject (template) {
   // Выполняем препроцессинг плагинами
@@ -510,7 +529,7 @@ function renderObject (template) {
         node.addEventListener(key.slice(2), value)
       } else {
         autorun(() => {
-          setAttributeSafe(node, key, getComputed(value))
+          setAttributeSafe(node, key, callOrGet(value))
         })
       }
     }
@@ -551,8 +570,8 @@ function setAttributeSafe (elem, key, value) {
   }
 }
 
-// RENDER ARRAY
-// -----------------------------------------------------------------------------
+/* RENDER ARRAY
+---------------------------------------------*/
 
 function renderArray (template) {
   const [startNode, endNode] = createBoundaryNodes()
@@ -563,8 +582,8 @@ function renderArray (template) {
   ]
 }
 
-// RENDER FUNCTION
-// -----------------------------------------------------------------------------
+/* RENDER FUNCTION
+---------------------------------------------*/
 
 function renderFunction (template) {
   const [startNode, endNode] = createBoundaryNodes()
@@ -601,8 +620,8 @@ function renderFunction (template) {
   ]
 }
 
-// RENDER STREAM
-// -----------------------------------------------------------------------------
+/* RENDER STREAM
+---------------------------------------------*/
 
 function renderStream (stream) {
   const nodes = renderArray(stream)
@@ -667,15 +686,15 @@ function renderStream (stream) {
   return nodes
 }
 
-// ADD RENDER PLUGIN
-// -----------------------------------------------------------------------------
+/* ADD RENDER PLUGIN
+---------------------------------------------*/
 
 function addRenderPlugin (plugin) {
   plugins.push(plugin)
 }
 
-// RAW
-// -----------------------------------------------------------------------------
+/* RAW
+---------------------------------------------*/
 
 function raw (string) {
   const div = render({})
@@ -683,15 +702,15 @@ function raw (string) {
   return Array.from(div.childNodes)
 }
 
-// DISCONTINUE
-// -----------------------------------------------------------------------------
+/* DISCONTINUE
+---------------------------------------------*/
 
 // stops all dynamic computation for the given element
 function discontinue (node) {
 }
 
-// OTHER
-// -----------------------------------------------------------------------------
+/* OTHER
+---------------------------------------------*/
 
 function removeNode (node) {
   // node.remove()
@@ -778,8 +797,8 @@ function onStop (comp, fn) {
   })
 }
 
-// UTILS
-// -----------------------------------------------------------------------------
+/* UTILS
+---------------------------------------------*/
 
 function isStringOrNumber (any) {
   return typeof any === 'string' || typeof any === 'number'

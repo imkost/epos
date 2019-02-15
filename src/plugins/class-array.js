@@ -8,13 +8,30 @@ const classArray = {
   postprocess ({ state, node }) {
     if (state.class) {
       autorun(() => {
-        const className = [].concat(dynamic(state.class))
-          .filter(c => c && typeof c === 'string')
-          .join(' ')
-          .split(/\s+/)
-          .join(' ')
-        node.setAttribute('class', className)
+        let cls = callOrGet(state.class)
+        if (Array.isArray(cls)) {
+          let result = ''
+          cls.forEach(c => {
+            if (c && typeof c === 'string') {
+              const words = c.split(/\s+/)
+              if (result) {
+                result += ' ' + words.join(' ')
+              } else {
+                result += words.join(' ')
+              }
+            }
+          })
+          cls = result
+        }
+
+        if (cls && typeof cls === 'string') {
+          node.setAttribute('class', cls)
+        } else {
+          node.removeAttribute('class', cls)
+        }
       })
     }
   }
 }
+
+render.addPlugin(classArray)
