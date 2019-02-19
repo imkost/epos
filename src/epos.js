@@ -50,7 +50,7 @@ window.Epos = {
   transaction,
   render,
   raw,
-  discontinue
+  discontinue // dispouse?
 }
 
 render.addPlugin = addRenderPlugin
@@ -514,6 +514,7 @@ function renderObject (template) {
 
   // Создаем ноду
   let node
+  // TODO: валидировать tag
   const tag = template.tag || 'div'
   if (template.xmlns) {
     node = document.createElementNS(template.xmlns, tag)
@@ -525,8 +526,8 @@ function renderObject (template) {
   for (const key in template) {
     if (key !== 'tag' && key !== 'inner' && key !== 'xmlns') {
       const value = template[key]
-      if (events.includes(key) && isFunction(value)) {
-        node.addEventListener(key.slice(2), value)
+      if (events.includes(key.toLowerCase()) && isFunction(value)) {
+        node.addEventListener(key.toLowerCase().slice(2), value)
       } else {
         autorun(() => {
           setAttributeSafe(node, key, callOrGet(value))
