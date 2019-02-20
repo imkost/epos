@@ -46,11 +46,12 @@
 
 window.Epos = {
   dynamic,
+  getOrCall,
   autorun,
-  transaction,
+  compound,
   render,
-  raw,
-  discontinue // dispouse?
+  renderRaw,
+  discontinue
 }
 
 render.addPlugin = addRenderPlugin
@@ -97,16 +98,26 @@ const _usages_ = Symbol('usages')
 ---------------------------------------------*/
 
 /**
- * Имеет два различных поведения:
- * 1. Если передать функцию, то сработает как `getComputed`.
- * 2. Иначе создаст источник.
+ * TODO: добавить описание
  */
 function dynamic (any) {
   if (isFunction(any)) {
     return getComputed(any)
   }
 
-  return createSource(any)
+  if (isObject(any) || isArray(any)) {
+    return createSource(any)
+  }
+
+  return any
+}
+
+function getOrCall (any) {
+  if (isFunction(any)) {
+    return any()
+  }
+
+  return any
 }
 
 /* CREATE SOURCE
@@ -261,29 +272,10 @@ function createSourceArray (array, parentChange) {
   }
 }
 
-/* CALL OR GET
----------------------------------------------*/
-
-// TODO: добавить ее в api?
-function callOrGet (value) {
-  if (isFunction(value)) {
-    return value()
-  }
-
-  return value
-}
-
-
 /* GET COMPUTED
 ---------------------------------------------*/
 
-function getComputed (any) {
-  if (!isFunction(any)) {
-    return any
-  }
-
-  const fn = any
-
+function getComputed (fn) {
   // Если для переданной функции еще не вызывался `getComputed`
   if (!fn[_source_]) {
     // Создаем счетчик использований, который говорит сколько раз getComputed
@@ -339,10 +331,10 @@ function getComputed (any) {
   return fn[_source_].value$
 }
 
-/* TRANSACTION
+/* COMPOUND
 ---------------------------------------------*/
 
-function transaction (fn) {
+function compound (fn) {
   // Сохраняем родительский стэк
   const parentStack = curStack
 
@@ -365,7 +357,7 @@ function transaction (fn) {
 ---------------------------------------------*/
 
 // TODO: подумать над реактивным индексом
-// возможно что-то вроде dynamic(i) или i.value$
+// возможно что-то вроде Epos.dynamic(i) или i.value$
 function createStream (sourceArray, fn) {
   const stream = createSource(sourceArray.map(fn))
 
@@ -514,7 +506,6 @@ function renderObject (template) {
 
   // Создаем ноду
   let node
-  // TODO: валидировать tag
   const tag = template.tag || 'div'
   if (template.xmlns) {
     node = document.createElementNS(template.xmlns, tag)
@@ -530,7 +521,7 @@ function renderObject (template) {
         node.addEventListener(key.toLowerCase().slice(2), value)
       } else {
         autorun(() => {
-          setAttributeSafe(node, key, callOrGet(value))
+          setAttributeSafe(node, key, getOrCall(value, true))
         })
       }
     }
@@ -694,10 +685,10 @@ function addRenderPlugin (plugin) {
   plugins.push(plugin)
 }
 
-/* RAW
+/* RENDER RAW
 ---------------------------------------------*/
 
-function raw (string) {
+function renderRaw (string) {
   const div = render({})
   div.innerHTML = string
   return Array.from(div.childNodes)
@@ -706,7 +697,7 @@ function raw (string) {
 /* DISCONTINUE
 ---------------------------------------------*/
 
-// stops all dynamic computation for the given element
+// stops all dynamic computations for the given element
 function discontinue (node) {
 }
 

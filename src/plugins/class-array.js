@@ -8,7 +8,7 @@ const classArray = {
   postprocess ({ state, node }) {
     if (state.class) {
       autorun(() => {
-        let cls = callOrGet(state.class)
+        let cls = Epos.getOrCall(state.class)
         if (Array.isArray(cls)) {
           let result = ''
           cls.forEach(c => {

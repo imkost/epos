@@ -210,7 +210,7 @@ test('autorun standalone', () => {
   assert(secondRuns === 8)
 })
 
-test('transaction', () => {
+test('compound', () => {
   let app
   let store
   const getData = () => {
@@ -247,9 +247,9 @@ test('transaction', () => {
     }
   }
 
-  // Bad order inside transaction => OK
+  // Bad order inside compound => OK
   ;[store, app] = getData()
-  transaction(() => {
+  compound(() => {
     store.selected$ = 2
     store.items.push$({ title: 'd' })
   })
