@@ -1,6 +1,8 @@
-# Epos. Dynamic UI library for performance hunters.
+# Epos
 
-```
+Dynamic UI library for performance hunters
+
+```js
 const store = Epos.dynamic({
   text: 'welcome'
 })
