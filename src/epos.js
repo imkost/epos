@@ -1,4 +1,11 @@
 /**
+ * Copyright (c) Konstantin Zemtsovsky
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/**
  * Эпос использует несколько своих внутренних понятий.
  * Пройдемся по каждому из них:
  *
@@ -56,8 +63,7 @@ let curGet = null
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * Текущее реактивное вычисление.
- * Вычисления создаются функцией autorun.
+ * Current reactive computation. Computations are created by `autorun`.
  */
 let curComp = null
 
@@ -73,16 +79,14 @@ let curStack = null
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * Incrementing counter.
- * Used for creating boundary nodes.
+ * Counter for creating boundary nodes
  */
 let boundaryId = 1
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * List of all possible event names:
- * "onclick", "onmousedown", etc
+ * List of all possible event names: "onclick", "onmousedown", etc
  */
 const events = getAllPossibleEventNames()
 
@@ -161,6 +165,8 @@ function createSourceObject (object, parentChange) {
 
   return source
 
+  /* - - - - */
+
   function set$ (key, value) {
     setSourceProp(key, value)
     if (parentChange) {
@@ -217,6 +223,8 @@ function createSourceArray (array, parentChange) {
 
   return source
 
+  /* - - - - */
+
   function map$ (fn) {
     return createStream(source, fn)
   }
@@ -265,14 +273,9 @@ function createSourceArray (array, parentChange) {
     }
     removeCount = Math.max(0, Math.min(source.length - start, removeCount))
 
-    // Каждый item переводим в источник
-    items = items.map(i => createSource(i))
-
-    // Производим оригинальный сплайс
-    const removed = source.splice(start, removeCount, ...items)
-
-    // Вызываем "слушателей" сплайса
-    callFnsStack(source[_splice_], start, removeCount, ...items)
+    items = items.map(i => createSource(i)) // every item to source
+    const removed = source.splice(start, removeCount, ...items) // call original splice
+    callFnsStack(source[_splice_], start, removeCount, ...items) // call all splice$ listeners
 
     // Для реактивности считаем, что сплайс изменяет переменную
     // (на самом деле ссылка не меняется), поэтому вызываем `parentChange`
