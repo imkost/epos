@@ -33,16 +33,8 @@
  * TODO: добавить описание
  */
 
-// TODO:
-// если вручную удалить элемент elem.remove() или elem.outerHTML = '',
-// то он удалится из дома, в памяти он все еще будет жить, если до него есть
-// ссылка. поэтому правильно, чтобы на нем вся динамичность продолжала
-// выполняться. если мы хотим убить всю динамичность, то нужно вызвать
-// какой-то метод
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-// TODO:
-// всюду где используются `.remove()` надо кажется останавливать реактивности
-// внутри или все уже останавливается?
 window.Epos = {
   dynamic,
   autorun,
@@ -54,44 +46,79 @@ window.Epos = {
 
 render.addPlugin = addRenderPlugin
 
-// Функция, которая срабатывает на реактивный get переменной
-let curGet = null
-
-// Текущее реактивное вычисление (вычисления создаются функцией autorun)
-let curComp = null
-
-// Список отложенных реакций на реактивность. Используется для compound.
-// Без compound реакции моментальны, не кладутся в стэк.
-let curStack = null
-
-// Счетчик с инкрементом, используется для создания баундари-нод
-let boundaryId = 1
-
-// Список всевозможных названий dom-событий ('onclick', 'onmousedown' и т.д.)
-const events = getAllEvents()
-
-// Список плагинов для рендеринга
-const plugins = []
-
-// Набор функций, которые будут выполнены, когда root-computation
-// перевычислится. Под рутовым вычислением имеется в виду тот, который
-// перевычислился при реактивном измененнии одной из своих зависимостей,
-// а не тот, который перевычислился из-за того, что его родитель-computation
-// перевычислился. Этот набор нужен для реализации `getComputed`.
-const afterRun = new Set()
-
-// Все символы, которые используются Эпосом
-const _boundaryId_ = Symbol('boundaryId')
-const _children_ = Symbol('children')
-const _comp_ = Symbol('comp')
-const _isStream_ = Symbol('isStream')
-const _source_ = Symbol('source')
-const _splice_ = Symbol('splice')
-const _usages_ = Symbol('usages')
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * TODO: добавить описание
+ * A function to be called on reactive getter
  */
+let curGet = null
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * Текущее реактивное вычисление.
+ * Вычисления создаются функцией autorun.
+ */
+let curComp = null
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * Список отложенных реакций на реактивность.
+ * Используется для compound. Без compound реакции
+ * моментальны, не кладутся в стэк.
+ */
+let curStack = null
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * Incrementing counter.
+ * Used for creating boundary nodes.
+ */
+let boundaryId = 1
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * A list of all possible event names:
+ * "onclick", "onmousedown", etc
+ */
+const events = getAllPossibleEventNames()
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * A list of render plugins
+ */
+const plugins = []
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * Набор функций, которые будут выполнены, когда root-computation
+ * перевычислится. Под рутовым вычислением имеется в виду тот, который
+ * перевычислился при реактивном измененнии одной из своих зависимостей,
+ * а не тот, который перевычислился из-за того, что его родитель-computation
+ * перевычислился. Этот набор нужен для реализации `getComputed`.
+ */
+const afterRun = new Set()
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * All symbols used by Epos
+ */
+const _comp_ = Symbol('comp')
+const _usages_ = Symbol('usages')
+const _source_ = Symbol('source')
+const _splice_ = Symbol('splice')
+const _children_ = Symbol('children')
+const _isStream_ = Symbol('isStream')
+const _boundaryId_ = Symbol('boundaryId')
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function dynamic (any) {
   if (isFunction(any)) {
     return getComputed(any)
@@ -104,11 +131,14 @@ function dynamic (any) {
   return any
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /**
- * Источник из объекта — это обычный объект, но с динамичными полями
- * (те, которые мнимые и кончаются на $).
+ * 1. Источник из объекта.
+ * Это обычный объект, но с динамичными полями (те, которые мнимые и кончаются на $).
  *
- * Источник из массива — это массив с мнимыми методами pop$/push$/etc.
+ * 2. Источник из массива.
+ * Это массив с мнимыми методами pop$/push$/etc.
  *
  * Если передать ни объект и ни массив, то вернется переданное значение.
  *
@@ -128,6 +158,8 @@ function createSource (any, parentChange) {
   return any
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function createSourceObject (object, parentChange) {
   const source = {}
 
@@ -136,17 +168,11 @@ function createSourceObject (object, parentChange) {
   }
 
   Object.defineProperties(source, {
-    delete$: { get: () => delete$ },
-    set$: { get: () => set$ }
+    set$: { get: () => set$ },
+    delete$: { get: () => delete$ }
   })
 
   return source
-
-  function delete$ (key) {
-    source[`${key}$`] = undefined
-    delete source[key]
-    delete source[`${key}$`]
-  }
 
   function set$ (key, value) {
     setSourceProp(key, value)
@@ -155,16 +181,20 @@ function createSourceObject (object, parentChange) {
     }
   }
 
+  function delete$ (key) {
+    source[`${key}$`] = undefined
+    delete source[key]
+    delete source[`${key}$`]
+  }
+
   function setSourceProp (key, value) {
-    // Набор функций, которые будут вызваны при реактивном изменении значения
+    // A set of functions to be called on a reactive value change
     const change = new Set()
     source[key] = createSource(value, change)
 
     Object.defineProperty(source, `${key}$`, {
-      configurable: true, // enable deleting
+      configurable: true, // required for `delete source['key$']` to work
       get () {
-        // Через curGet мы получаем способ "слушать" get-события, благодаря
-        // чему и реализуется реактивность. curGet проставляется authorun-ом.
         if (curGet) {
           curGet(change)
         }
@@ -172,11 +202,7 @@ function createSourceObject (object, parentChange) {
       },
       set (newValue) {
         if (source[key] !== newValue) {
-          // Не забываем превращать новые значения в источник,
-          // чтобы и у нихработала реактивность
           source[key] = createSource(newValue, change)
-
-          // Вызываем все change-"слушатели"
           callFnsStack(change)
         }
         return true
@@ -185,12 +211,14 @@ function createSourceObject (object, parentChange) {
   }
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
+
   // Набор функций, которые будут вызваны при splice$
   source[_splice_] = new Set()
 
-  // Навешиваем мнимые реактивные методы: pop$/push$/etc
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
     push$: { get: () => push$ },
@@ -269,6 +297,8 @@ function createSourceArray (array, parentChange) {
   }
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function getComputed (fn) {
   // Если для переданной функции еще не вызывался `getComputed`
   if (!fn[_source_]) {
@@ -325,6 +355,8 @@ function getComputed (fn) {
   return fn[_source_].value$
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function compound (fn) {
   // Сохраняем родительский стэк
   const parentStack = curStack
@@ -343,6 +375,8 @@ function compound (fn) {
   // И переходим обратно в родительский стэк
   curStack = parentStack
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 // TODO: подумать над реактивным индексом
 // возможно что-то вроде Epos.dynamic(i) или i.value$
@@ -364,6 +398,8 @@ function createStream (sourceArray, fn) {
 
   return stream
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * Самая сложная для понимания часть библиотеки. Все реактивные вещи —
@@ -444,6 +480,8 @@ function autorun (fn, isStandalone = false) {
   }
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function render (template) {
   if (template instanceof window.Node) {
     return template
@@ -472,8 +510,12 @@ function render (template) {
   return document.createTextNode('')
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function renderObject (template) {
-  // Выполняем препроцессинг плагинами
+  /**
+   * 1. Preprocess with plugins
+   */
   const stateByPlugin = new Map()
   for (const plugin of plugins) {
     if (plugin.preprocess) {
@@ -483,7 +525,9 @@ function renderObject (template) {
     }
   }
 
-  // Создаем ноду
+  /**
+   * 2. Create node
+   */
   let node
   const tag = template.tag || 'div'
   if (template.xmlns) {
@@ -492,7 +536,9 @@ function renderObject (template) {
     node = document.createElement(tag)
   }
 
-  // Проставляем атрибуты и навешиваем события
+  /**
+   * 3. Set attributes and add event listeners
+   */
   for (const key in template) {
     if (key !== 'tag' && key !== 'inner' && key !== 'xmlns') {
       const value = template[key]
@@ -506,13 +552,17 @@ function renderObject (template) {
     }
   }
 
-  // Рендерим и добавляем детей
+  /**
+   * 4. Render children and attach them to the node
+   */
   const children = toFlatArray(render(template.inner))
   for (const child of children) {
     node.appendChild(child)
   }
 
-  // Постпроцессим плагинами
+  /**
+   * 5. Postprocess with plugins
+   */
   for (const plugin of plugins) {
     if (plugin.postprocess) {
       const state = stateByPlugin.get(plugin)
@@ -523,8 +573,10 @@ function renderObject (template) {
   return node
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function setAttributeSafe (elem, key, value) {
-  // Если валидное значение, то проставляем его
+  // `value` is valid => set attribute
   if (isStringOrNumber(value) || typeof value === 'boolean') {
     // Если поле есть на элементе, то меняем его, иначе — ставим атрибут.
     // Почему так? Например, для input-ов есть поле value и менять его
@@ -535,11 +587,13 @@ function setAttributeSafe (elem, key, value) {
     } else {
       elem.setAttribute(key, value)
     }
-  // Если невалидное, удаляем атрибут
+  // Otherwise => delete attribute
   } else {
     elem.removeAttribute(key)
   }
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function renderArray (template) {
   const [startNode, endNode] = createBoundaryNodes()
@@ -549,6 +603,8 @@ function renderArray (template) {
     endNode
   ]
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function renderFunction (template) {
   const [startNode, endNode] = createBoundaryNodes()
@@ -584,6 +640,8 @@ function renderFunction (template) {
     endNode
   ]
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function renderStream (stream) {
   const nodes = renderArray(stream)
@@ -648,9 +706,13 @@ function renderStream (stream) {
   return nodes
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function addRenderPlugin (plugin) {
   plugins.push(plugin)
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function renderRaw (string) {
   const div = render({})
@@ -658,36 +720,53 @@ function renderRaw (string) {
   return Array.from(div.childNodes)
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 // stops all dynamic computations for the given element
 function discontinue (node) {
   // TODO: implement
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function removeNode (node) {
   // node.remove()
   // discontinue(node)
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /**
- * Навешивает splice-слушатель на переданный sourceArray
+ * Adds splice listener for the given source-array
  */
 function onSplice (sourceArray, fn) {
-  if (sourceArray[_splice_]) {
-    sourceArray[_splice_].add(fn)
+  sourceArray[_splice_].add(fn)
 
-    // Если мы внутри computation-а, ...
-    if (curComp) {
-      // ... то при его остановке перестаем слушать сплайс
-      onStop(curComp, () => {
-        sourceArray[_splice_].delete(fn)
-      })
-    }
+  // Stop listener if current computation stops
+  if (curComp) {
+    onStop(curComp, () => {
+      sourceArray[_splice_].delete(fn)
+    })
   }
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 /**
- * Вызывает все переданные функции с переданными аргументами одну за другой,
- * но если мы внутри транзакции, то кладет вызовы в стэк
+ * Calls all given functions one by one
+ * fns = Array/Set
+ */
+function callFns (fns, ...args) {
+  for (const fn of Array.from(fns)) {
+    fn(...args)
+  }
+}
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+/**
+ * Same as `callFns`, but stack-aware.
+ * If inside compound => push fns to stack instead of calling
  */
 function callFnsStack (fns, ...args) {
   if (!fns) {
@@ -705,21 +784,13 @@ function callFnsStack (fns, ...args) {
   }
 }
 
-/**
- * Просто вызывает все переданные функции с переданными аргументами
- */
-function callFns (fns, ...args) {
-  for (const fn of Array.from(fns)) {
-    fn(...args)
-  }
-}
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * Возвращает список всевозможных dom-событий ('onclick', 'onmousedown', etc)
- * Взято отсюда:
+ * Returns a list of all possible DOM events: "onclick", "onmousedown", etc.
  * https://css-tricks.com/snippets/javascript/get-possible-dom-events/
  */
-function getAllEvents () {
+function getAllPossibleEventNames () {
   const events = []
   for (const key in document) {
     const value = document[key]
@@ -731,6 +802,8 @@ function getAllEvents () {
   return events
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function createBoundaryNodes () {
   const startNode = document.createTextNode('')
   const endNode = document.createTextNode('')
@@ -740,6 +813,8 @@ function createBoundaryNodes () {
   return [startNode, endNode]
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function onStop (comp, fn) {
   comp[_children_].push({
     stop () {
@@ -748,25 +823,37 @@ function onStop (comp, fn) {
   })
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function isStringOrNumber (any) {
   return typeof any === 'string' || typeof any === 'number'
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function isFunction (any) {
   return typeof any === 'function'
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function isObject (any) {
   return Object.prototype.toString.call(any) === '[object Object]'
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function isArray (any) {
   return Array.isArray(any) && !any[_isStream_]
 }
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
 function isStream (any) {
   return any && any[_isStream_]
 }
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function toFlatArray (any) {
   return isArray(any) ? any.flat() : [any]
