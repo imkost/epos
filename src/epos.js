@@ -1,4 +1,4 @@
-/*!
+/**
  * Эпос использует несколько своих внутренних понятий.
  * Пройдемся по каждому из них:
  *
@@ -43,21 +43,16 @@
 // TODO:
 // всюду где используются `.remove()` надо кажется останавливать реактивности
 // внутри или все уже останавливается?
-
 window.Epos = {
   dynamic,
-  getOrCall,
   autorun,
   compound,
   render,
   renderRaw,
-  discontinue
+  discontinue // flee? release? dismiss?
 }
 
 render.addPlugin = addRenderPlugin
-
-/* VARS
----------------------------------------------*/
 
 // Функция, которая срабатывает на реактивный get переменной
 let curGet = null
@@ -65,14 +60,14 @@ let curGet = null
 // Текущее реактивное вычисление (вычисления создаются функцией autorun)
 let curComp = null
 
-// Список отложенных реакций на реактивность. Используется для транзакций.
-// Без транзакций реакции моментальны, не кладутся в стэк.
+// Список отложенных реакций на реактивность. Используется для compound.
+// Без compound реакции моментальны, не кладутся в стэк.
 let curStack = null
 
 // Счетчик с инкрементом, используется для создания баундари-нод
 let boundaryId = 1
 
-// Список всевозможных названий dom-событий ('onclick', 'onmousedown', etc)
+// Список всевозможных названий dom-событий ('onclick', 'onmousedown' и т.д.)
 const events = getAllEvents()
 
 // Список плагинов для рендеринга
@@ -94,9 +89,6 @@ const _source_ = Symbol('source')
 const _splice_ = Symbol('splice')
 const _usages_ = Symbol('usages')
 
-/* DYNAMIC
----------------------------------------------*/
-
 /**
  * TODO: добавить описание
  */
@@ -112,17 +104,6 @@ function dynamic (any) {
   return any
 }
 
-function getOrCall (any) {
-  if (isFunction(any)) {
-    return any()
-  }
-
-  return any
-}
-
-/* CREATE SOURCE
----------------------------------------------*/
-
 /**
  * Источник из объекта — это обычный объект, но с динамичными полями
  * (те, которые мнимые и кончаются на $).
@@ -137,7 +118,7 @@ function getOrCall (any) {
  */
 function createSource (any, parentChange) {
   if (isObject(any)) {
-    return createSourceObject(any)
+    return createSourceObject(any, parentChange)
   }
 
   if (isArray(any)) {
@@ -147,19 +128,40 @@ function createSource (any, parentChange) {
   return any
 }
 
-/* CREATE SOURCE OBJECT
----------------------------------------------*/
-
-function createSourceObject (object) {
+function createSourceObject (object, parentChange) {
   const source = {}
 
   for (const key in object) {
-    const value = object[key]
+    setSourceProp(key, object[key])
+  }
+
+  Object.defineProperties(source, {
+    delete$: { get: () => delete$ },
+    set$: { get: () => set$ }
+  })
+
+  return source
+
+  function delete$ (key) {
+    source[`${key}$`] = undefined
+    delete source[key]
+    delete source[`${key}$`]
+  }
+
+  function set$ (key, value) {
+    setSourceProp(key, value)
+    if (parentChange) {
+      callFnsStack(parentChange)
+    }
+  }
+
+  function setSourceProp (key, value) {
     // Набор функций, которые будут вызваны при реактивном изменении значения
     const change = new Set()
     source[key] = createSource(value, change)
 
     Object.defineProperty(source, `${key}$`, {
+      configurable: true, // enable deleting
       get () {
         // Через curGet мы получаем способ "слушать" get-события, благодаря
         // чему и реализуется реактивность. curGet проставляется authorun-ом.
@@ -181,12 +183,7 @@ function createSourceObject (object) {
       }
     })
   }
-
-  return source
 }
-
-/* CREATE SOURCE ARRAY
----------------------------------------------*/
 
 function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
@@ -272,9 +269,6 @@ function createSourceArray (array, parentChange) {
   }
 }
 
-/* GET COMPUTED
----------------------------------------------*/
-
 function getComputed (fn) {
   // Если для переданной функции еще не вызывался `getComputed`
   if (!fn[_source_]) {
@@ -331,9 +325,6 @@ function getComputed (fn) {
   return fn[_source_].value$
 }
 
-/* COMPOUND
----------------------------------------------*/
-
 function compound (fn) {
   // Сохраняем родительский стэк
   const parentStack = curStack
@@ -352,9 +343,6 @@ function compound (fn) {
   // И переходим обратно в родительский стэк
   curStack = parentStack
 }
-
-/* CREATE STREAM
----------------------------------------------*/
 
 // TODO: подумать над реактивным индексом
 // возможно что-то вроде Epos.dynamic(i) или i.value$
@@ -376,9 +364,6 @@ function createStream (sourceArray, fn) {
 
   return stream
 }
-
-/* AUTHORUN
----------------------------------------------*/
 
 /**
  * Самая сложная для понимания часть библиотеки. Все реактивные вещи —
@@ -459,9 +444,6 @@ function autorun (fn, isStandalone = false) {
   }
 }
 
-/* RENDER
----------------------------------------------*/
-
 function render (template) {
   if (template instanceof window.Node) {
     return template
@@ -489,9 +471,6 @@ function render (template) {
 
   return document.createTextNode('')
 }
-
-/* RENDER OBJECT
----------------------------------------------*/
 
 function renderObject (template) {
   // Выполняем препроцессинг плагинами
@@ -521,7 +500,7 @@ function renderObject (template) {
         node.addEventListener(key.toLowerCase().slice(2), value)
       } else {
         autorun(() => {
-          setAttributeSafe(node, key, getOrCall(value, true))
+          setAttributeSafe(node, key, isFunction(value) ? value() : value)
         })
       }
     }
@@ -562,9 +541,6 @@ function setAttributeSafe (elem, key, value) {
   }
 }
 
-/* RENDER ARRAY
----------------------------------------------*/
-
 function renderArray (template) {
   const [startNode, endNode] = createBoundaryNodes()
   return [
@@ -573,9 +549,6 @@ function renderArray (template) {
     endNode
   ]
 }
-
-/* RENDER FUNCTION
----------------------------------------------*/
 
 function renderFunction (template) {
   const [startNode, endNode] = createBoundaryNodes()
@@ -611,9 +584,6 @@ function renderFunction (template) {
     endNode
   ]
 }
-
-/* RENDER STREAM
----------------------------------------------*/
 
 function renderStream (stream) {
   const nodes = renderArray(stream)
@@ -678,15 +648,9 @@ function renderStream (stream) {
   return nodes
 }
 
-/* ADD RENDER PLUGIN
----------------------------------------------*/
-
 function addRenderPlugin (plugin) {
   plugins.push(plugin)
 }
-
-/* RENDER RAW
----------------------------------------------*/
 
 function renderRaw (string) {
   const div = render({})
@@ -694,15 +658,10 @@ function renderRaw (string) {
   return Array.from(div.childNodes)
 }
 
-/* DISCONTINUE
----------------------------------------------*/
-
 // stops all dynamic computations for the given element
 function discontinue (node) {
+  // TODO: implement
 }
-
-/* OTHER
----------------------------------------------*/
 
 function removeNode (node) {
   // node.remove()
@@ -788,9 +747,6 @@ function onStop (comp, fn) {
     }
   })
 }
-
-/* UTILS
----------------------------------------------*/
 
 function isStringOrNumber (any) {
   return typeof any === 'string' || typeof any === 'number'
