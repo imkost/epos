@@ -165,7 +165,7 @@ function createSourceObject (object, parentChange) {
 
   return source
 
-  /* - - - - */
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   function set$ (key, value) {
     setSourceProp(key, value)
@@ -174,19 +174,21 @@ function createSourceObject (object, parentChange) {
     }
   }
 
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
   function delete$ (key) {
     source[`${key}$`] = undefined
     delete source[key]
     delete source[`${key}$`]
   }
 
-  function setSourceProp (key, value) {
-    // A set of functions to be called on a reactive value change
-    const change = new Set()
-    source[key] = createSource(value, change)
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+  function setSourceProp (key, value) {
+    const change = new Set() // fns to be called on reactive value change
+    source[key] = createSource(value, change)
     Object.defineProperty(source, `${key}$`, {
-      configurable: true, // required for `delete source['key$']` to work
+      configurable: true, // for `delete source['key$']` to work
       get () {
         if (curGet) {
           curGet(change)
@@ -208,9 +210,7 @@ function createSourceObject (object, parentChange) {
 
 function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
-
-  // A set of functions to be called after `splice$()`
-  source[_splice_] = new Set()
+  source[_splice_] = new Set() // fns to be called after splice$
 
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
@@ -223,49 +223,52 @@ function createSourceArray (array, parentChange) {
 
   return source
 
-  /* - - - - */
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   function map$ (fn) {
     return createStream(source, fn)
   }
 
-  // Все функции по изменению массива реализовываем через splice и далее
-  // по коду считаем, что существует только splice. Так проще: поддерживаем
-  // реактивность только для splice-а, а не для каждого метода отдельно.
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+  /**
+   * All of these functions are implemented via splice$. Why?
+   * It's just simpler, we impelement reactivity only for splice$ and get
+   * reactivity for all the reset functions for free.
+   */
   function pop$ () {
     const removed = splice$(source.length - 1, 1)
     return removed[0]
   }
-
   function push$ (item) {
     splice$(source.length, 0, item)
     return source.length
   }
-
   function shift$ () {
     const removed = splice$(0, 1)
     return removed[0]
   }
-
   function unshift$ (item) {
     splice$(0, 0, item)
     return source.length
   }
 
+  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
   function splice$ (start, removeCount, ...items) {
-    // Переводим start и removeCount в более удобные значения.
-    //
-    // start и removeCount могут быть любыми числами, например, они могут быть
-    // отрицательными или выходить за размеры массива. Оригинальный js-овский
-    // splice поддерживает всевозможные случаи. Для удобства, мы переводим
-    // нестандартные значения в равносильные, но более удобные:
-    // start не может быть меньше нуля и больше размера массива,
-    // removeCount тоже неотрицательный и не может "выходить" за размеры
-    // массива.
-    //
-    // TODO: прочекать, что будет, если передавать нецелые числа
-    // TODO: прочекать, что будет, если передавать не числа
+    /**
+     * 1. Make `start` and `removeCount` usage-friendly.
+     * - - - - - - - - - - - - - - - - - - -- - - - - - -
+     * start и removeCount могут быть любыми числами, например, они могут быть
+     * отрицательными или выходить за размеры массива. Оригинальный js-овский
+     * splice поддерживает всевозможные случаи. Для удобства, мы переводим
+     * нестандартные значения в равносильные, но более удобные:
+     * start не может быть меньше нуля и больше размера массива,
+     * removeCount тоже неотрицательный и не может "выходить" за размеры
+     * массива.
+     * TODO: прочекать, что будет, если передавать нецелые числа
+     * TODO: прочекать, что будет, если передавать не числа
+     */
     if (start < 0) {
       start = Math.max(0, source.length + start)
     } else if (start > source.length - 1) {
@@ -273,12 +276,26 @@ function createSourceArray (array, parentChange) {
     }
     removeCount = Math.max(0, Math.min(source.length - start, removeCount))
 
-    items = items.map(i => createSource(i)) // every item to source
-    const removed = source.splice(start, removeCount, ...items) // call original splice
-    callFnsStack(source[_splice_], start, removeCount, ...items) // call all splice$ listeners
+    /**
+     * 2. Every item to source
+     */
+    items = items.map(i => createSource(i))
 
-    // Для реактивности считаем, что сплайс изменяет переменную
-    // (на самом деле ссылка не меняется), поэтому вызываем `parentChange`
+    /**
+     * 3. Call original splice
+     */
+    const removed = source.splice(start, removeCount, ...items)
+
+    /**
+     * 4. Call splice$ listeners
+     */
+    callFnsStack(source[_splice_], start, removeCount, ...items)
+
+    /**
+     * 5. Вызываем `parentChange`
+     * Для реактивности считаем, что сплайс изменяет переменную
+     * (на самом деле ссылка не меняется), поэтому вызываем `parentChange`
+     */
     if (parentChange) {
       callFnsStack(parentChange)
     }
