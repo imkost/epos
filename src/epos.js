@@ -351,9 +351,6 @@ function getComputed (fn) {
           // Обнуляем source
           fn[_source_] = null
         }
-
-        // Перестаем проверять использования
-        afterRun.delete(checkUsages)
       }
     })
   }
@@ -435,27 +432,19 @@ function autorun (fn, isStandalone = false) {
 
   function run () {
     stop()
-
-    // Сохраняем родительские get и comp
     const parentGet = curGet
     const parentComp = curComp
-
-    // Меняем текущие get и comp (создаем новый скоуп)
     curGet = get
     curComp = comp
-
-    // Вызываем функцию в текущем скоупе
     fn()
-
-    // Возвращаемся в родительский скоуп
     curGet = parentGet
     curComp = parentComp
 
     // Если `curComp` оказался null-ом, значит это закончил свое перевычисление
     // root-computation (см. описание `afterRun` выше).
     if (curComp === null) {
-      // Вызываем все функции в `afterRun`
       callFns(afterRun)
+      afterRun.clear()
     }
   }
 
