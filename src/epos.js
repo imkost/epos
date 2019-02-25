@@ -49,7 +49,7 @@ render.addPlugin = addRenderPlugin
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * A function to be called on reactive getter
+ * Function to be called on reactive getter
  */
 let curGet = null
 
@@ -81,7 +81,7 @@ let boundaryId = 1
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * A list of all possible event names:
+ * List of all possible event names:
  * "onclick", "onmousedown", etc
  */
 const events = getAllPossibleEventNames()
@@ -89,7 +89,7 @@ const events = getAllPossibleEventNames()
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * A list of render plugins
+ * List of render plugins
  */
 const plugins = []
 
@@ -133,19 +133,6 @@ function dynamic (any) {
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-/**
- * 1. Источник из объекта.
- * Это обычный объект, но с динамичными полями (те, которые мнимые и кончаются на $).
- *
- * 2. Источник из массива.
- * Это массив с мнимыми методами pop$/push$/etc.
- *
- * Если передать ни объект и ни массив, то вернется переданное значение.
- *
- * parentChange — это change (см. createSourceObject) source-родителя,
- * используется только для реализации источников-массивов, а в объектах
- * он не нужен.
- */
 function createSource (any, parentChange) {
   if (isObject(any)) {
     return createSourceObject(any, parentChange)
@@ -216,7 +203,7 @@ function createSourceObject (object, parentChange) {
 function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
 
-  // Набор функций, которые будут вызваны при splice$
+  // A set of functions to be called after `splice$()`
   source[_splice_] = new Set()
 
   Object.defineProperties(source, {
@@ -300,7 +287,9 @@ function createSourceArray (array, parentChange) {
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function getComputed (fn) {
-  // Если для переданной функции еще не вызывался `getComputed`
+  /**
+   * 1. If `getComputed` was never run for the given function
+   */
   if (!fn[_source_]) {
     // Создаем счетчик использований, который говорит сколько раз getComputed
     // от переданной функции вызывался внутри computation-ов
@@ -358,21 +347,12 @@ function getComputed (fn) {
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function compound (fn) {
-  // Сохраняем родительский стэк
   const parentStack = curStack
-
-  // Создаем новый
   curStack = []
-
-  // Выполняем транзакцию с новым стэком
   fn()
-
-  // Пачкой вызываем все реакции, которые накопились при вызове fn()
-  for (const callback of curStack) {
-    callback()
+  for (const f of curStack) {
+    f()
   }
-
-  // И переходим обратно в родительский стэк
   curStack = parentStack
 }
 
