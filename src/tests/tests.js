@@ -623,6 +623,86 @@ test('change of splices array', () => {
   assert(innerRuns === 2)
 })
 
+test('several map$', () => {
+  const store = Epos.dynamic({
+    letters: ['a', 'b', 'c']
+  })
+
+  const app = Epos.render({
+    inner: store.letters
+      .map$(l => l.toUpperCase())
+      .map$(l => l + '-')
+  })
+
+  assert(app.innerHTML = 'A-B-C-')
+})
+
+test('render svg', () => {
+  const store = Epos.dynamic({
+    enabled: true,
+    visible: false,
+    r: 50
+  })
+
+  const app = Epos.render({
+    inner () {
+      if (!store.enabled$) {
+        return null
+      }
+
+      return [
+        {
+          tag: 'svg',
+          inner: [
+            {
+              tag: 'circle',
+              r () {
+                return store.r$
+              },
+              cx: 50,
+              cy: 50
+            },
+            () => {
+              if (store.visible$) {
+                return {
+                  tag: 'rect',
+                  x: 100,
+                  y: 100,
+                  width: 100,
+                  height: 100
+                }
+              }
+
+              return null
+            }
+          ]
+        },
+        {
+          tag: 'h2',
+          inner: 'ok'
+        }
+      ]
+    }
+  })
+
+  const svg = 'http://www.w3.org/2000/svg'
+  assert(app.querySelector('svg').namespaceURI === svg)
+  assert(app.querySelector('circle').namespaceURI === svg)
+
+  store.r$ = 10
+  assert(app.querySelector('circle').getAttribute('r') === '10')
+
+  store.visible$ = true
+  assert(app.querySelector('rect').namespaceURI === svg)
+
+  store.enabled$ = false
+  store.enabled$ = true
+  assert(app.querySelector('svg').namespaceURI === svg)
+  assert(app.querySelector('circle').namespaceURI === svg)
+  assert(app.querySelector('rect').namespaceURI === svg)
+  assert(app.querySelector('h2').namespaceURI === 'http://www.w3.org/1999/xhtml')
+})
+
 function testa (what, fn) {
   test(what, fn)
 }

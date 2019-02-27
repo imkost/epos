@@ -176,6 +176,7 @@ function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
   source[_splice_] = new Set() // fns to be called after splice$
 
+  // TODO: add sort$ and reverse$
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
     push$: { get: () => push$ },
@@ -407,7 +408,7 @@ function autorun (fn, isStandalone = false) {
   }
 }
 
-function render (template) {
+function render (template, isSvg) {
   if (template instanceof window.Node) {
     return template
   }
@@ -417,25 +418,25 @@ function render (template) {
   }
 
   if (isObject(template)) {
-    return renderObject(template)
+    return renderObject(template, isSvg)
   }
 
   if (isArray(template)) {
-    return renderArray(template)
+    return renderArray(template, isSvg)
   }
 
   if (isFunction(template)) {
-    return renderFunction(template)
+    return renderFunction(template, isSvg)
   }
 
   if (isStream(template)) {
-    return renderStream(template)
+    return renderStream(template, isSvg)
   }
 
   return document.createTextNode('')
 }
 
-function renderObject (template) {
+function renderObject (template, isSvg) {
   // const parentComp = curComp
   // const comp = {
   //   stop () {
@@ -453,7 +454,6 @@ function renderObject (template) {
   // node.comp = comp
   // curComp = parentComp
 
-
   // Preprocess with plugins
   const stateByPlugin = new Map()
   for (const plugin of plugins) {
@@ -467,28 +467,31 @@ function renderObject (template) {
   // Create node
   let node
   const tag = template.tag || 'div'
-  if (template.xmlns) {
-    node = document.createElementNS(template.xmlns, tag)
+  if (tag === 'svg') {
+    isSvg = true
+  }
+  if (isSvg) {
+    node = document.createElementNS('http://www.w3.org/2000/svg', tag)
   } else {
     node = document.createElement(tag)
   }
 
   // Set attributes and add event listeners
   for (const key in template) {
-    if (key !== 'tag' && key !== 'inner' && key !== 'xmlns') {
+    if (key !== 'tag' && key !== 'inner') {
       const value = template[key]
       if (events.includes(key.toLowerCase()) && isFunction(value)) {
         node.addEventListener(key.toLowerCase().slice(2), value)
       } else {
         autorun(() => {
-          setAttributeSafe(node, key, isFunction(value) ? value() : value)
+          setAttributeSafe(node, key, isFunction(value) ? value() : value, isSvg)
         })
       }
     }
   }
 
   // Render children and attach them to the node
-  const children = toFlatArray(render(template.inner))
+  const children = toFlatArray(render(template.inner, isSvg))
   for (const child of children) {
     node.appendChild(child)
   }
@@ -504,40 +507,40 @@ function renderObject (template) {
   return node
 }
 
-function setAttributeSafe (elem, key, value) {
+function setAttributeSafe (node, key, value, isSvg) {
   // `value` is valid => set attribute
   if (isStringOrNumber(value) || typeof value === 'boolean') {
     // Если поле есть на элементе, то меняем его, иначе — ставим атрибут.
     // Почему так? Например, для input-ов есть поле value и менять его
     // следует именно через input.value, а не через
     // input.setAttribute('value', ...)
-    if (key in elem) {
-      elem[key] = value
+    if (key in node && !isSvg) {
+      node[key] = value
     } else {
-      elem.setAttribute(key, value)
+      node.setAttribute(key, value)
     }
   // Otherwise => delete attribute
   } else {
-    elem.removeAttribute(key)
+    node.removeAttribute(key)
   }
 }
 
-function renderArray (template) {
+function renderArray (template, isSvg) {
   const [startNode, endNode] = createBoundaryNodes()
   return [
     startNode,
-    ...toFlatArray(template.map(render)),
+    ...toFlatArray(template.map(i => render(i, isSvg))),
     endNode
   ]
 }
 
-function renderFunction (template) {
+function renderFunction (template, isSvg) {
   const [startNode, endNode] = createBoundaryNodes()
   let isFirstRun = true
   let nodes
 
   autorun(() => {
-    const newNodes = toFlatArray(render(template()))
+    const newNodes = toFlatArray(render(template(), isSvg))
 
     if (isFirstRun) {
       nodes = newNodes
@@ -562,7 +565,7 @@ function renderFunction (template) {
   return [startNode, ...nodes, endNode]
 }
 
-function renderStream (stream) {
+function renderStream (stream, isSvg) {
   const nodes = renderArray(stream)
   const startNode = nodes[0]
   const endNode = nodes[nodes.length - 1]
@@ -611,7 +614,7 @@ function renderStream (stream) {
     }
 
     for (const item of items) {
-      const ii = toFlatArray(render(item))
+      const ii = toFlatArray(render(item, isSvg))
       for (const i of ii) {
         bef.parentNode.insertBefore(i, bef)
       }
