@@ -40,64 +40,44 @@
  * TODO: добавить описание
  */
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 window.Epos = {
   dynamic,
   autorun,
   compound,
-  render,
+  render: Object.assign(render, { addPlugin: addRenderPlugin }),
   renderRaw,
   discontinue // flee? release? dismiss?
 }
 
-render.addPlugin = addRenderPlugin
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
- * Function to be called on reactive getter
+ * Function to be called on reactive getter.
  */
 let curGet = null
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * Current reactive computation. Computations are created by `autorun`.
  */
 let curComp = null
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
- * Список отложенных реакций на реактивность.
- * Используется для compound. Без compound реакции
- * моментальны, не кладутся в стэк.
+ * List of all delayed reactions. Used for compound.
  */
 let curStack = null
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
- * Counter for creating boundary nodes
+ * Counter for creating boundary nodes.
  */
 let boundaryId = 1
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
- * List of all possible event names: "onclick", "onmousedown", etc
+ * List of all possible event names: "onclick", "onmousedown", etc.
  */
 const events = getAllPossibleEventNames()
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
- * List of render plugins
+ * List of render plugins.
  */
 const plugins = []
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * Набор функций, которые будут выполнены, когда root-computation
@@ -107,8 +87,6 @@ const plugins = []
  * перевычислился. Этот набор нужен для реализации `getComputed`.
  */
 const afterRun = new Set()
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * All symbols used by Epos
@@ -120,8 +98,6 @@ const _splice_ = Symbol('splice')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function dynamic (any) {
   if (isFunction(any)) {
@@ -135,8 +111,6 @@ function dynamic (any) {
   return any
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function createSource (any, parentChange) {
   if (isObject(any)) {
     return createSourceObject(any, parentChange)
@@ -148,8 +122,6 @@ function createSource (any, parentChange) {
 
   return any
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function createSourceObject (object, parentChange) {
   const source = {}
@@ -165,8 +137,6 @@ function createSourceObject (object, parentChange) {
 
   return source
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
   function set$ (key, value) {
     setSourceProp(key, value)
     if (parentChange) {
@@ -174,15 +144,11 @@ function createSourceObject (object, parentChange) {
     }
   }
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
   function delete$ (key) {
     source[`${key}$`] = undefined
     delete source[key]
     delete source[`${key}$`]
   }
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   function setSourceProp (key, value) {
     const change = new Set() // fns to be called on reactive value change
@@ -206,8 +172,6 @@ function createSourceObject (object, parentChange) {
   }
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
   source[_splice_] = new Set() // fns to be called after splice$
@@ -223,13 +187,9 @@ function createSourceArray (array, parentChange) {
 
   return source
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
   function map$ (fn) {
     return createStream(source, fn)
   }
-
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
   /**
    * All of these functions are implemented via splice$. Why?
@@ -253,12 +213,10 @@ function createSourceArray (array, parentChange) {
     return source.length
   }
 
-  /* - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
   function splice$ (start, removeCount, ...items) {
     /**
-     * 1. Make `start` and `removeCount` usage-friendly.
-     * - - - - - - - - - - - - - - - - - - -- - - - - - -
+     * Make `start` and `removeCount` usage-friendly.
+     *
      * start и removeCount могут быть любыми числами, например, они могут быть
      * отрицательными или выходить за размеры массива. Оригинальный js-овский
      * splice поддерживает всевозможные случаи. Для удобства, мы переводим
@@ -276,26 +234,16 @@ function createSourceArray (array, parentChange) {
     }
     removeCount = Math.max(0, Math.min(source.length - start, removeCount))
 
-    /**
-     * 2. Every item to source
-     */
+    // Every item to source
     items = items.map(i => createSource(i))
 
-    /**
-     * 3. Call original splice
-     */
+    // Call original splice
     const removed = source.splice(start, removeCount, ...items)
 
-    /**
-     * 4. Call splice$ listeners
-     */
+    // Call splice$ listeners
     callFnsStack(source[_splice_], start, removeCount, ...items)
 
-    /**
-     * 5. Вызываем `parentChange`
-     * Для реактивности считаем, что сплайс изменяет переменную
-     * (на самом деле ссылка не меняется), поэтому вызываем `parentChange`
-     */
+    // Call `parentChange`, because splice$ changes array (in reactivity)
     if (parentChange) {
       callFnsStack(parentChange)
     }
@@ -304,12 +252,8 @@ function createSourceArray (array, parentChange) {
   }
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function getComputed (fn) {
-  /**
-   * 1. If `getComputed` was never run for the given function
-   */
+  // If `getComputed` was never run for the given function
   if (!fn[_source_]) {
     // Создаем счетчик использований, который говорит сколько раз getComputed
     // от переданной функции вызывался внутри computation-ов
@@ -361,8 +305,6 @@ function getComputed (fn) {
   return fn[_source_].value$
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function compound (fn) {
   const parentStack = curStack
   curStack = []
@@ -372,8 +314,6 @@ function compound (fn) {
   }
   curStack = parentStack
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 // TODO: подумать над реактивным индексом
 // возможно что-то вроде Epos.dynamic(i) или i.value$
@@ -395,8 +335,6 @@ function createStream (sourceArray, fn) {
 
   return stream
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * Самая сложная для понимания часть библиотеки. Все реактивные вещи —
@@ -469,8 +407,6 @@ function autorun (fn, isStandalone = false) {
   }
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function render (template) {
   if (template instanceof window.Node) {
     return template
@@ -499,12 +435,26 @@ function render (template) {
   return document.createTextNode('')
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function renderObject (template) {
-  /**
-   * 1. Preprocess with plugins
-   */
+  // const parentComp = curComp
+  // const comp = {
+  //   stop () {
+  //     for (const child of comp[_children_]) {
+  //       child.stop()
+  //     }
+  //     comp[_children_] = []
+  //   },
+  //   [_children_]: []
+  // }
+  // if (parentComp) {
+  //   parentComp[_children_].push(comp)
+  // }
+  // curComp = comp
+  // node.comp = comp
+  // curComp = parentComp
+
+
+  // Preprocess with plugins
   const stateByPlugin = new Map()
   for (const plugin of plugins) {
     if (plugin.preprocess) {
@@ -514,9 +464,7 @@ function renderObject (template) {
     }
   }
 
-  /**
-   * 2. Create node
-   */
+  // Create node
   let node
   const tag = template.tag || 'div'
   if (template.xmlns) {
@@ -525,9 +473,7 @@ function renderObject (template) {
     node = document.createElement(tag)
   }
 
-  /**
-   * 3. Set attributes and add event listeners
-   */
+  // Set attributes and add event listeners
   for (const key in template) {
     if (key !== 'tag' && key !== 'inner' && key !== 'xmlns') {
       const value = template[key]
@@ -541,17 +487,13 @@ function renderObject (template) {
     }
   }
 
-  /**
-   * 4. Render children and attach them to the node
-   */
+  // Render children and attach them to the node
   const children = toFlatArray(render(template.inner))
   for (const child of children) {
     node.appendChild(child)
   }
 
-  /**
-   * 5. Postprocess with plugins
-   */
+  // Postprocess with plugins
   for (const plugin of plugins) {
     if (plugin.postprocess) {
       const state = stateByPlugin.get(plugin)
@@ -561,8 +503,6 @@ function renderObject (template) {
 
   return node
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function setAttributeSafe (elem, key, value) {
   // `value` is valid => set attribute
@@ -582,8 +522,6 @@ function setAttributeSafe (elem, key, value) {
   }
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function renderArray (template) {
   const [startNode, endNode] = createBoundaryNodes()
   return [
@@ -593,13 +531,11 @@ function renderArray (template) {
   ]
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function renderFunction (template) {
   const [startNode, endNode] = createBoundaryNodes()
+  let isFirstRun = true
   let nodes
 
-  let isFirstRun = true
   autorun(() => {
     const newNodes = toFlatArray(render(template()))
 
@@ -607,30 +543,24 @@ function renderFunction (template) {
       nodes = newNodes
       isFirstRun = false
     } else {
-      // Создаем фрагмент со всеми новыми нодами
+      // Create fragment with new nodes
       const fragment = document.createDocumentFragment()
       for (const newNode of newNodes) {
         fragment.appendChild(newNode)
       }
 
-      // Удаляем все ноды между start и end
+      // Remove all nodes between start and end
       while (startNode.nextSibling !== endNode) {
         startNode.nextSibling.remove()
       }
 
-      // Вставляем фрагмент между start и end
+      // Insert fragment between start and end
       endNode.parentNode.insertBefore(fragment, endNode)
     }
   })
 
-  return [
-    startNode,
-    ...nodes,
-    endNode
-  ]
+  return [startNode, ...nodes, endNode]
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function renderStream (stream) {
   const nodes = renderArray(stream)
@@ -695,13 +625,9 @@ function renderStream (stream) {
   return nodes
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function addRenderPlugin (plugin) {
   plugins.push(plugin)
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function renderRaw (string) {
   const div = render({})
@@ -709,21 +635,15 @@ function renderRaw (string) {
   return Array.from(div.childNodes)
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 // stops all dynamic computations for the given element
 function discontinue (node) {
   // TODO: implement
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function removeNode (node) {
   // node.remove()
   // discontinue(node)
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * Adds splice listener for the given source-array
@@ -739,8 +659,6 @@ function onSplice (sourceArray, fn) {
   }
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
  * Calls all given functions one by one
  * fns = Array/Set
@@ -750,8 +668,6 @@ function callFns (fns, ...args) {
     fn(...args)
   }
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
  * Same as `callFns`, but stack-aware.
@@ -773,8 +689,6 @@ function callFnsStack (fns, ...args) {
   }
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 /**
  * Returns a list of all possible DOM events: "onclick", "onmousedown", etc.
  * https://css-tricks.com/snippets/javascript/get-possible-dom-events/
@@ -791,8 +705,6 @@ function getAllPossibleEventNames () {
   return events
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function createBoundaryNodes () {
   const startNode = document.createTextNode('')
   const endNode = document.createTextNode('')
@@ -802,8 +714,6 @@ function createBoundaryNodes () {
   return [startNode, endNode]
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function onStop (comp, fn) {
   comp[_children_].push({
     stop () {
@@ -812,37 +722,25 @@ function onStop (comp, fn) {
   })
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function isStringOrNumber (any) {
   return typeof any === 'string' || typeof any === 'number'
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function isFunction (any) {
   return typeof any === 'function'
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function isObject (any) {
   return Object.prototype.toString.call(any) === '[object Object]'
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function isArray (any) {
   return Array.isArray(any) && !any[_isStream_]
 }
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
 function isStream (any) {
   return any && any[_isStream_]
 }
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 function toFlatArray (any) {
   return isArray(any) ? any.flat() : [any]

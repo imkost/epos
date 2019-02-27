@@ -1,4 +1,4 @@
-const { render, dynamic, autorun, compound, discontinue } = window.Epos
+// const { render, dynamic, autorun, compound, discontinue } = window.Epos
 
 test('render string', () => {
   const n = render('smth')
@@ -509,78 +509,59 @@ test('complex', () => {
     ]
   })
 
-  const strings = store.numbers.map$(number => {
-    return `${number.v}:`
-  })
+  // const strings = store.numbers.map$(number => {
+  //   return `${number.v}:`
+  // })
 
-  const uppered = store.items.map$(item => {
-    return item.toUpperCase()
-  })
+  // const uppered = store.items.map$(item => {
+  //   return item.toUpperCase()
+  // })
 
   const app = render({
     class: 'app',
     inner: [
-      {
-        class: 'strings',
-        inner: strings.map$(string => {
-          return string
-        })
-      },
+      // {
+      //   class: 'strings',
+      //   inner: strings.map$(string => {
+      //     return string
+      //   })
+      // },
 
-      () => {
-        if (store.show$) {
-          return uppered.map$(item => {
-            return `${item}-`
-          })
-        }
+      // () => {
+      //   if (store.show$) {
+      //     return uppered.map$(item => {
+      //       return `${item}-`
+      //     })
+      //   }
 
-        return {
-          tag: 'i',
-          inner: 'nothing'
-        }
-      },
+      //   return {
+      //     tag: 'i',
+      //     inner: 'nothing'
+      //   }
+      // },
 
       {
         inner: store.items.map$(char => {
-          return [
-            {
-              tag: 'h2',
-              inner: char.toUpperCase()
-            },
-            store.numbers.map$(number => {
-              return () => {
-                if (store.show$) {
-                  return [
-                    {
-                      class: 'a',
-                      inner: store.items.map$(char => {
-                        return char.toUpperCase() + '-'
-                      })
-                    }
-                  ]
-                }
-                return {
-                  inner: 'not shown'
-                }
-              }
-            })
-          ]
+          return store.numbers.map$(number => number.v)
         })
       }
     ]
   })
 
-  assert(app.querySelector('.strings').innerHTML === '1:')
+  store.items.splice$(1, 1)
+  store.numbers.pop$()
 
-  store.numbers.push$({ v: 7 })
-  assert(app.querySelector('.strings').innerHTML === '1:7:')
-  assert(app.querySelectorAll('.a').length === 6)
+  // assert(app.querySelector('.strings').innerHTML === '1:')
 
-  store.items.push$('g')
-  assert(app.querySelector('.a').innerHTML === 'A-B-C-G-')
-  assert(app.innerText.startsWith('1:7:A-B-C-G-'))
+  // store.numbers.push$({ v: 7 })
+  // assert(app.querySelector('.strings').innerHTML === '1:7:')
+  // assert(app.querySelectorAll('.a').length === 6)
 
-  store.items.splice$(1, 1, 'fa')
+  // store.items.push$('g')
+  // assert(app.querySelector('.a').innerHTML === 'A-B-C-G-')
+  // assert(app.innerText.startsWith('1:7:A-B-C-G-'))
+
+  // store.items.splice$(1, 1, 'fa')
   // store.numbers.shift$()
   // assert(app.querySelector('.strings').innerHTML === '7:')
   // assert(app.innerText.startsWith('7:A-FA-C-G-'))

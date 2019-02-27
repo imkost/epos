@@ -17,21 +17,32 @@ const Terser = require('terser')
 
   es5 = `
     (() => {
-      const d = document
+      const d = document;
+      const f = Array.from;
+      const S = Symbol;
+      const O = Object.defineProperties;
+      const s = () => new Set()
       ${es5
         .split('document.').join('d.')
+        .split('Array.from').join('f')
+        .replace(/Symbol\('\w+'\)/g, 'S()')
+        .split('Object.defineProperties').join('O')
+        .split('new Set()').join('s()')
       }
     })()
   `
   es5 = Terser.minify(es5, {
     compress: {
+      arrows: true,
       passes: 2,
       drop_console: true,
       unsafe_methods: true,
+      unsafe_arrows: true,
       unsafe_proto: true
     }
   })
-  es5 = es5.code.split(':function(').join('(')
+  es5 = es5.code
+    .split(':function(').join('(')
   Fs.writeFileSync('src/epos.min.js', es5)
 
   const minified = Fs.readFileSync('src/epos.min.js', 'utf-8')
