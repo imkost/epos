@@ -1,3 +1,6 @@
+// TODO: идея для перформанса
+// вместо того, чтобы делать nextSibling до endBoundary, мы создаем ссылку startBoundary[_endBoundary_]
+
 /**
  * Copyright (c) Konstantin Zemtsovsky
  *
@@ -132,7 +135,8 @@ function createSourceObject (object, parentChange) {
 
   Object.defineProperties(source, {
     set$: { get: () => set$ },
-    delete$: { get: () => delete$ }
+    delete$: { get: () => delete$ },
+    get$: { get: () => get$ }
   })
 
   return source
@@ -148,6 +152,13 @@ function createSourceObject (object, parentChange) {
     source[`${key}$`] = undefined
     delete source[key]
     delete source[`${key}$`]
+  }
+
+  function get$ (key) {
+    if (key in source) {
+      return source[`${key}$`]
+    }
+    // TODO: implement dynamic setting and deleting
   }
 
   function setSourceProp (key, value) {
@@ -267,7 +278,11 @@ function getComputed (fn) {
 
     // Перевычисляем значение в standalone-computation (передаем true в авторан)
     fn[_comp_] = autorun(() => {
-      fn[_source_].value$ = fn()
+      // TODO: в юнифиде в некоторых ситуациях получалось так, что autorun
+      // бежит, а _source_ уже нет. Баг? Или ок?
+      if (fn[_source_]) {
+        fn[_source_].value$ = fn()
+      }
     }, true)
   }
 

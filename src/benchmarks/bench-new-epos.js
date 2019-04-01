@@ -28,15 +28,15 @@ const app = render({
         }
       }
     },
-    {
-      class: 'iks',
-      inner () {
-        console.log('run');
-        return [].concat(store.posts$, store.posts$, store.posts$, store.posts$, store.posts$, store.posts$).filter(p => {
-          return p.title$.includes('ik')
-        }).length
-      }
-    },
+    // {
+    //   class: 'iks',
+    //   inner () {
+    //     console.log('run');
+    //     return [].concat(store.posts$, store.posts$, store.posts$, store.posts$, store.posts$, store.posts$).filter(p => {
+    //       return p.title$.includes('ik')
+    //     }).length
+    //   }
+    // },
     // {
     //   class: 'posts',
     //   inner: store.posts.map$(post => {
@@ -53,18 +53,37 @@ const app = render({
     {
       class: 'posts',
       inner: store.posts.map$(post => {
-        return () => {
-          if (isHidden(post)) {
-            return null
-          }
-
-          return {
-            class: 'post',
-            inner () {
-              return post.title$
-            }
-          }
+        function isPostHidden () {
+          return isHidden(post)
         }
+
+        return {
+          class () {
+            return `post ${Epos.dynamic(isPostHidden) ? 'hidden' : ''}`
+          },
+          inner: post.title
+        }
+        // return () => {
+        //   if (Epos.dynamic(isPostHidden)) {
+        //     return null
+        //   }
+
+        //   return {
+        //     class: 'post',
+        //     inner: [
+        //       () => post.title$,
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' },
+        //       { inner: '---' }
+        //     ]
+        //   }
+        // }
       })
     }
   ]
@@ -83,7 +102,7 @@ function start () {
   console.time('a')
   // store.query$ = 'b'
   // store.query$ = 'ab'
-  store.query$ = 'ы'
+  store.query$ = 's'
 
   requestAnimationFrame(() => {
     console.timeEnd('a')

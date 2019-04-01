@@ -8,9 +8,11 @@ root.innerHTML = `
   <div>
     <input v-model="query"/>
   </div>
+  <!--
   <div class="iks">
     {{iks()}}
   </div>
+  -->
   <div class="posts">
     <div v-for="post in posts" v-if="visible(post)" class="post">{{post.title}}</div>
   </div>

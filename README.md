@@ -1,13 +1,15 @@
 # Epos
 
-Dynamic UI library for performance hunters
+Dynamic UI library
 
 ```js
-const store = Epos.dynamic({
+import { dynamic, render } from 'epos'
+
+const store = dynamic({
   text: 'welcome'
 })
 
-const app = Epos.render({
+const app = render({
   class: 'app'
   inner: () => store.text$
 })
