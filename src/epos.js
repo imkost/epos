@@ -49,7 +49,7 @@ window.Epos = {
   compound,
   render: Object.assign(render, { addPlugin: addRenderPlugin }),
   renderRaw,
-  discontinue // flee? release? dismiss?
+  suspend
 }
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
@@ -718,8 +718,10 @@ function renderRaw (string) {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-// stops all dynamic computations for the given element
-function discontinue (node) {
+/**
+ * Stops all dynamic computations for the given node
+ */
+function suspend (node) {
   if (node[_comps_]) {
     for (const comp of node[_comps_]) {
       comp.stop()
@@ -731,7 +733,7 @@ function discontinue (node) {
 
 function removeNode (node) {
   node.remove()
-  discontinue(node)
+  suspend(node)
 }
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */

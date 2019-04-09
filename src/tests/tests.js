@@ -1,4 +1,4 @@
-// const { render, dynamic, autorun, compound, discontinue } = window.Epos
+// const { render, dynamic, autorun, compound, suspend } = window.Epos
 
 test('render string', () => {
   const n = render('smth')
@@ -461,7 +461,7 @@ test('getComputed several times', () => {
   assert(isShownRuns === 2)
 })
 
-test('discontinue', () => {
+test('suspend', () => {
   const store = dynamic({
     show: false,
     title: 'a'
@@ -494,7 +494,7 @@ test('discontinue', () => {
   store.title$ = 'c'
   assert(titleRuns === 3)
 
-  discontinue(tooltip)
+  suspend(tooltip)
   comp.stop()
   store.title$ = 'd'
   assert(titleRuns === 3)
@@ -703,7 +703,7 @@ test('render svg', () => {
   assert(app.querySelector('h2').namespaceURI === 'http://www.w3.org/1999/xhtml')
 })
 
-test('discontinue', () => {
+test('suspend', () => {
   const store = dynamic({
     visible: true,
     text: 'ok',
@@ -738,7 +738,7 @@ test('discontinue', () => {
   document.body.removeChild($app)
   store.text$ = 'oksi'
   assert(runs === 3)
-  discontinue($app)
+  suspend($app)
   store.text$ = 'oksis'
   assert(runs === 3)
   store.text2$ = 'iks'
