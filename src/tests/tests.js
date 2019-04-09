@@ -703,6 +703,48 @@ test('render svg', () => {
   assert(app.querySelector('h2').namespaceURI === 'http://www.w3.org/1999/xhtml')
 })
 
+test('discontinue', () => {
+  const store = dynamic({
+    visible: true,
+    text: 'ok',
+    text2: 's'
+  })
+
+  let runs = 0
+  let runs2 = 0
+  const $app = render({
+    inner () {
+      if (store.visible$) {
+        return [
+          {
+            inner () {
+              runs += 1
+              return store.text$
+            }
+          },
+          () => {
+            runs2 += 1
+            return store.text2$
+          }
+        ]
+      }
+    }
+  })
+
+  assert(runs === 1)
+  document.body.appendChild($app)
+  store.text$ = 'oks'
+  assert(runs === 2)
+  document.body.removeChild($app)
+  store.text$ = 'oksi'
+  assert(runs === 3)
+  discontinue($app)
+  store.text$ = 'oksis'
+  assert(runs === 3)
+  store.text2$ = 'iks'
+  assert(runs === 3)
+})
+
 function testa (what, fn) {
   test(what, fn)
 }
