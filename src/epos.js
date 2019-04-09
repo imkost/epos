@@ -47,6 +47,8 @@ window.Epos = {
   dynamic,
   autorun,
   compound,
+
+  // DOM-related
   render: Object.assign(render, { addPlugin: addRenderPlugin }),
   renderRaw,
   suspend
