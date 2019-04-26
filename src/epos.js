@@ -55,6 +55,7 @@
 window.Epos = {
   dynamic,
   autorun,
+  computed,
   compound,
 
   // DOM-related
@@ -119,7 +120,7 @@ const plugins = []
  * перевычислится. Под рутовым вычислением имеется в виду тот, который
  * перевычислился при реактивном измененнии одной из своих зависимостей,
  * а не тот, который перевычислился из-за того, что его родитель-computation
- * перевычислился. Этот набор нужен для реализации `getComputed`.
+ * перевычислился. Этот набор нужен для реализации `computed`.
  */
 const afterRun = new Set()
 
@@ -140,10 +141,6 @@ const _boundaryId_ = Symbol('boundaryId')
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 function dynamic (any) {
-  if (isFunction(any)) {
-    return getComputed(any)
-  }
-
   if (isObject(any) || isArray(any)) {
     return createSource(any)
   }
@@ -309,10 +306,10 @@ function createSourceArray (array, parentChange) {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-function getComputed (fn) {
-  // If `getComputed` was never run for the given function
+function computed (fn) {
+  // If `computed` was never run for the given function
   if (!fn[_source_]) {
-    // Создаем счетчик использований, который говорит сколько раз getComputed
+    // Создаем счетчик использований, который говорит сколько раз computed
     // от переданной функции вызывался внутри computation-ов
     fn[_usages_] = 0
 
@@ -341,13 +338,13 @@ function getComputed (fn) {
 
     onStop(curComp, () => {
       // Когда computation останавливается, понижаем счетчик использований.
-      // Если внутри computation-а getComputed от одной функции вызовется
+      // Если внутри computation-а computed от одной функции вызовется
       // дважды, то счетчик увеличится на 2, а при остановке уменьшится
       // на 2 — все ок.
       fn[_usages_] -= 1
 
       // Как только рутовый computation закончится, нужно проверить, что
-      // getComputed от функции нигде больше не используется ...
+      // computed от функции нигде больше не используется ...
       afterRun.add(checkUsages)
 
       function checkUsages () {
@@ -366,7 +363,7 @@ function getComputed (fn) {
   }
 
   // Возвращаем реактивный get на value, таким образом computation, который
-  // внутри вызывает getComputed(fn) будет зависеть динамически только
+  // внутри вызывает computed(fn) будет зависеть динамически только
   // от результата fn, а не от всех ее внутренностей
   return fn[_source_].value$
 }
@@ -560,15 +557,17 @@ function renderObject (template, isSvg) {
 
   // Set attributes and add event listeners
   for (const key in template) {
-    if (key !== 'tag' && key !== 'inner') {
-      const value = template[key]
-      if (events.includes(key.toLowerCase()) && isFunction(value)) {
-        node.addEventListener(key.toLowerCase().slice(2), value)
-      } else {
-        autorun(() => {
-          setAttributeSafe(node, key, isFunction(value) ? value() : value, isSvg)
-        })
-      }
+    if (key === 'tag' || key === 'inner') {
+      continue
+    }
+
+    const value = template[key]
+    if (events.includes(key.toLowerCase()) && isFunction(value)) {
+      node.addEventListener(key.toLowerCase().slice(2), value)
+    } else {
+      autorun(() => {
+        setAttributeSafe(node, key, isFunction(value) ? value() : value, isSvg)
+      })
     }
   }
 
