@@ -1,9 +1,5 @@
-/**
- * Copyright (c) Konstantin Zemtsovsky
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
+// TODO: throw exception if dynamic get not inside computation
+// TODO: add middle process for deleting only to prevent plugins conflicts (cleanupTemplate)
 
 // TODO: идея для перформанса
 // вместо того, чтобы делать nextSibling до endBoundary, мы создаем ссылку startBoundary[_endBoundary_]
@@ -11,6 +7,13 @@
 // idea: Epos.dynamic(value)
 // var hidden = Epos.dynamic(false)
 // hidden.set$(true), hidden.get$(), hidden.set(false), hidden.get()
+
+/**
+ * Copyright (c) Konstantin Zemtsovsky
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 /**
  * Эпос использует несколько своих внутренних понятий.
@@ -47,6 +50,8 @@
  * TODO: добавить описание
  */
 
+// TODO: dynamic + dynamicGet
+// dynamic(fnThatReturnsObject) // dynamic(object)
 window.Epos = {
   dynamic,
   autorun,
@@ -170,19 +175,12 @@ function createSourceObject (object, parentChange) {
   }
 
   Object.defineProperties(source, {
-    get$: { get: () => get$ },
     set$: { get: () => set$ },
-    delete$: { get: () => delete$ }
+    delete$: { get: () => delete$ },
+    get$: { get: () => get$ }
   })
 
   return source
-
-  function get$ (key) {
-    if (key in source) {
-      return source[`${key}$`]
-    }
-    // TODO: implement dynamic setting and deleting
-  }
 
   function set$ (key, value) {
     setSourceProp(key, value)
@@ -195,6 +193,13 @@ function createSourceObject (object, parentChange) {
     source[`${key}$`] = undefined
     delete source[key]
     delete source[`${key}$`]
+  }
+
+  function get$ (key) {
+    if (key in source) {
+      return source[`${key}$`]
+    }
+    // TODO: implement dynamic setting and deleting
   }
 
   function setSourceProp (key, value) {
@@ -225,7 +230,7 @@ function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
   source[_splice_] = new Set() // fns to be called after splice$
 
-  // TODO: add sort$ and reverse$ (maybe sorted$ and reversed$?)
+  // TODO: add sort$ and reverse$
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
     push$: { get: () => push$ },
@@ -320,6 +325,9 @@ function getComputed (fn) {
     fn[_comp_] = autorun(() => {
       // TODO: в юнифиде в некоторых ситуациях получалось так, что autorun
       // бежит, а _source_ уже нет. Баг? Или ок?
+      // UPD: скорее всего было связано с тем, что не было suspend,
+      // закмментирую if, проверим
+      // UPD2: все-таки нужно if. Надо разобраться почему
       if (fn[_source_]) {
         fn[_source_].value$ = fn()
       }
@@ -332,14 +340,14 @@ function getComputed (fn) {
     fn[_usages_] += 1
 
     onStop(curComp, () => {
-      // А когда computation останавливается, понижаем счетчик использований.
+      // Когда computation останавливается, понижаем счетчик использований.
       // Если внутри computation-а getComputed от одной функции вызовется
       // дважды, то счетчик увеличится на 2, а при остановке уменьшится
       // на 2 — все ок.
       fn[_usages_] -= 1
 
       // Как только рутовый computation закончится, нужно проверить, что
-      // getComputed от функции нигде больше не используется ....
+      // getComputed от функции нигде больше не используется ...
       afterRun.add(checkUsages)
 
       function checkUsages () {
@@ -353,6 +361,8 @@ function getComputed (fn) {
         }
       }
     })
+  } else {
+    // TODO: throw error
   }
 
   // Возвращаем реактивный get на value, таким образом computation, который
@@ -378,7 +388,7 @@ function compound (fn) {
 // TODO: подумать над реактивным индексом
 // возможно что-то вроде Epos.dynamic(i) или i.value$
 function createStream (sourceArray, fn) {
-  const stream = createSourceArray(sourceArray.map(it => fn(it)))
+  const stream = createSourceArray(sourceArray.map(item => fn(item)))
 
   // Помечаем поток, чтобы при рендеринге отличать его от массива
   stream[_isStream_] = true
@@ -386,7 +396,7 @@ function createStream (sourceArray, fn) {
   // Слушаем splice$
   onSplice(sourceArray, (start, removeCount, ...items) => {
     // Трансформируем новые значения
-    items = items.map(it => fn(it))
+    items = items.map(item => fn(item))
 
     // Делаем реактивный splice$, что стриггерить слушателей потока, если такие имеются
     stream.splice$(start, removeCount, ...items)
@@ -605,16 +615,9 @@ function setAttributeSafe (node, key, value, isSvg) {
 
 function renderArray (template, isSvg) {
   const [startNode, endNode] = createBoundaryNodes()
-
-  // const prevCurNode = curNode
-  // curNode = startNode
-  // curNode[_comps_] = []
-  const nodes = toFlatArray(template.map(i => render(i, isSvg)))
-  // curNode = prevCurNode
-
   return [
     startNode,
-    ...nodes,
+    ...toFlatArray(template.map(i => render(i, isSvg))),
     endNode
   ]
 }
@@ -626,10 +629,7 @@ function renderFunction (template, isSvg) {
   let isFirstRun = true
   let nodes
 
-  // const prevCurNode = curNode
-  // curNode = startNode
-  // curNode[_comps_] = []
-  const comp = autorun(() => {
+  autorun(() => {
     const newNodes = toFlatArray(render(template(), isSvg))
 
     if (isFirstRun) {
@@ -651,8 +651,6 @@ function renderFunction (template, isSvg) {
       endNode.parentNode.insertBefore(fragment, endNode)
     }
   })
-  // curNode[_comps_].push(comp)
-  // curNode = prevCurNode
 
   return [startNode, ...nodes, endNode]
 }
