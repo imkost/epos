@@ -12,17 +12,23 @@ const mountUnmount = {
     if (!template) {
       return
     }
-
     if (template.onMount) {
       state.onMount = template.onMount
-      delete template.onMount
     }
-
     if (template.onUnmount) {
       state.onUnmount = template.onUnmount
+    }
+  },
+
+  cleanupTemplate () {
+    if (template.onMount) {
+      delete template.onMount
+    }
+    if (template.onUnmount) {
       delete template.onUnmount
     }
   },
+
   postprocess ({ state, template, node }) {
     if (state.onMount || state.onUnmount) {
       elemsToObserve.add(node)

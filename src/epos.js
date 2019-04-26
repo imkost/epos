@@ -539,6 +539,13 @@ function renderObject (template, isSvg) {
     }
   }
 
+  // Cleanup template by plugins
+  for (const plugin of plugins) {
+    if (plugin.cleanupTemplate) {
+      plugin.cleanupTemplate({ template })
+    }
+  }
+
   // Create node
   let node
   const tag = template.tag || 'div'
