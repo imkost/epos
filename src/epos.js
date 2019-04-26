@@ -1,12 +1,16 @@
-// TODO: идея для перформанса
-// вместо того, чтобы делать nextSibling до endBoundary, мы создаем ссылку startBoundary[_endBoundary_]
-
 /**
  * Copyright (c) Konstantin Zemtsovsky
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
+
+// TODO: идея для перформанса
+// вместо того, чтобы делать nextSibling до endBoundary, мы создаем ссылку startBoundary[_endBoundary_]
+//
+// idea: Epos.dynamic(value)
+// var hidden = Epos.dynamic(false)
+// hidden.set$(true), hidden.get$(), hidden.set(false), hidden.get()
 
 /**
  * Эпос использует несколько своих внутренних понятий.
@@ -166,12 +170,19 @@ function createSourceObject (object, parentChange) {
   }
 
   Object.defineProperties(source, {
+    get$: { get: () => get$ },
     set$: { get: () => set$ },
-    delete$: { get: () => delete$ },
-    get$: { get: () => get$ }
+    delete$: { get: () => delete$ }
   })
 
   return source
+
+  function get$ (key) {
+    if (key in source) {
+      return source[`${key}$`]
+    }
+    // TODO: implement dynamic setting and deleting
+  }
 
   function set$ (key, value) {
     setSourceProp(key, value)
@@ -184,13 +195,6 @@ function createSourceObject (object, parentChange) {
     source[`${key}$`] = undefined
     delete source[key]
     delete source[`${key}$`]
-  }
-
-  function get$ (key) {
-    if (key in source) {
-      return source[`${key}$`]
-    }
-    // TODO: implement dynamic setting and deleting
   }
 
   function setSourceProp (key, value) {
@@ -221,7 +225,7 @@ function createSourceArray (array, parentChange) {
   const source = array.map(i => createSource(i))
   source[_splice_] = new Set() // fns to be called after splice$
 
-  // TODO: add sort$ and reverse$
+  // TODO: add sort$ and reverse$ (maybe sorted$ and reversed$?)
   Object.defineProperties(source, {
     pop$: { get: () => pop$ },
     push$: { get: () => push$ },
@@ -374,7 +378,7 @@ function compound (fn) {
 // TODO: подумать над реактивным индексом
 // возможно что-то вроде Epos.dynamic(i) или i.value$
 function createStream (sourceArray, fn) {
-  const stream = createSource(sourceArray.map(fn))
+  const stream = createSourceArray(sourceArray.map(it => fn(it)))
 
   // Помечаем поток, чтобы при рендеринге отличать его от массива
   stream[_isStream_] = true
@@ -382,10 +386,9 @@ function createStream (sourceArray, fn) {
   // Слушаем splice$
   onSplice(sourceArray, (start, removeCount, ...items) => {
     // Трансформируем новые значения
-    items = items.map(i => fn(i))
+    items = items.map(it => fn(it))
 
-    // Делаем реактивный splice$, что стриггерить слушателей потока,
-    // если такие имеются
+    // Делаем реактивный splice$, что стриггерить слушателей потока, если такие имеются
     stream.splice$(start, removeCount, ...items)
   })
 
@@ -602,9 +605,16 @@ function setAttributeSafe (node, key, value, isSvg) {
 
 function renderArray (template, isSvg) {
   const [startNode, endNode] = createBoundaryNodes()
+
+  // const prevCurNode = curNode
+  // curNode = startNode
+  // curNode[_comps_] = []
+  const nodes = toFlatArray(template.map(i => render(i, isSvg)))
+  // curNode = prevCurNode
+
   return [
     startNode,
-    ...toFlatArray(template.map(i => render(i, isSvg))),
+    ...nodes,
     endNode
   ]
 }
@@ -616,7 +626,10 @@ function renderFunction (template, isSvg) {
   let isFirstRun = true
   let nodes
 
-  autorun(() => {
+  // const prevCurNode = curNode
+  // curNode = startNode
+  // curNode[_comps_] = []
+  const comp = autorun(() => {
     const newNodes = toFlatArray(render(template(), isSvg))
 
     if (isFirstRun) {
@@ -638,6 +651,8 @@ function renderFunction (template, isSvg) {
       endNode.parentNode.insertBefore(fragment, endNode)
     }
   })
+  // curNode[_comps_].push(comp)
+  // curNode = prevCurNode
 
   return [startNode, ...nodes, endNode]
 }

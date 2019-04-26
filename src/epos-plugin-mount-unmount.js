@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-const elementsToObserve = new Set()
+const elemsToObserve = new Set()
 
 const mountUnmount = {
   preprocess ({ state, template }) {
@@ -25,7 +25,7 @@ const mountUnmount = {
   },
   postprocess ({ state, template, node }) {
     if (state.onMount || state.onUnmount) {
-      elementsToObserve.add(node)
+      elemsToObserve.add(node)
       node.onMount = state.onMount
       node.onUnmount = state.onUnmount
       startMo()
@@ -34,14 +34,14 @@ const mountUnmount = {
 }
 
 const mo = new MutationObserver(mutations => {
-  Array.from(elementsToObserve).forEach(elem => {
+  Array.from(elemsToObserve).forEach(elem => {
     if (elem.__isMounted) {
       if (!document.contains(elem)) {
         if (elem.onUnmount) {
           elem.onUnmount(elem)
         }
-        elementsToObserve.delete(elem)
-        if (elementsToObserve.size === 0) {
+        elemsToObserve.delete(elem)
+        if (elemsToObserve.size === 0) {
           stopMo()
         }
       }

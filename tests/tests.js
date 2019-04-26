@@ -118,6 +118,38 @@ test('render stream', () => {
   assert(app.innerText === 'FPGU')
 })
 
+test('render streams more', () => {
+  const store = dynamic({
+    visible: true,
+    items: [
+      { title: 'a' },
+      { title: 'b' },
+      { title: 'c' }
+    ]
+  })
+
+  let itemRunCount = 0
+  const app = render({
+    class: 'app',
+    inner () {
+      if (!store.visible$) {
+        return 'none'
+      }
+
+      return store.items.map$(item => {
+        itemRunCount += 1
+        return item.title.toUpperCase()
+      })
+    }
+  })
+
+  assert(itemRunCount === 3)
+
+  store.visible$ = false
+  store.items.push$({ title: 'd' })
+  assert(itemRunCount === 3)
+})
+
 test('autorun base', () => {
   const store = dynamic({
     number: 5
@@ -500,7 +532,49 @@ test('suspend', () => {
   assert(titleRuns === 3)
 })
 
-test('complex', () => {
+test('suspend 2', () => {
+  const store = dynamic({
+    visible: true,
+    text: 'ok',
+    text2: 's'
+  })
+
+  let runs = 0
+  let runs2 = 0
+  const $app = render({
+    inner () {
+      if (store.visible$) {
+        return [
+          {
+            inner () {
+              runs += 1
+              return store.text$
+            }
+          },
+          () => {
+            runs2 += 1
+            return store.text2$
+          }
+        ]
+      }
+    }
+  })
+
+  assert(runs === 1)
+  document.body.appendChild($app)
+  store.text$ = 'oks'
+  assert(runs === 2)
+  document.body.removeChild($app)
+  store.text$ = 'oksi'
+  assert(runs === 3)
+  suspend($app)
+  store.text$ = 'oksis'
+  assert(runs === 3)
+  store.text2$ = 'iks'
+  assert(runs === 3)
+})
+
+testa('complex', () => {
   const store = dynamic({
     show: true,
     items: ['a', 'b', 'c'],
@@ -517,6 +591,7 @@ test('complex', () => {
   //   return item.toUpperCase()
   // })
 
+  let numbersRun = 0
   const app = render({
     class: 'app',
     inner: [
@@ -542,14 +617,51 @@ test('complex', () => {
 
       {
         inner: store.items.map$(char => {
-          return store.numbers.map$(number => number.v)
+          return store.numbers.map$(number => {
+            numbersRun += 1
+            return number.v
+          })
         })
       }
+
+      Stream([ Stream, Stream, [startNode, [1,2,3], endNode] ])
+      при splice => оставить onSplice
+      Если делается splice, то у элемента нужно все onSplice удалять так же как удаляется autorun
+      возможно вынести эту логику прямо в autorun
+
+      // {
+      //   inner () {
+      //     console.log('rerun');
+      //     return store.items.map$(char => {
+      //       return () => {
+      //         if (!store.show$) {
+      //           return 'none'
+      //         }
+
+      //         return [
+      //           char,
+      //           store.numbers.map$(number => {
+      //             numbersRun += 1
+      //             return number.v
+      //           })
+      //         ]
+      //       }
+      //     })
+      //   }
+      // }
     ]
   })
+  window.store = store
 
-  store.items.splice$(1, 1)
+  assert(numbersRun === 3)
+
+  store.items.pop$()
+  assert(numbersRun === 3)
+
   store.numbers.pop$()
+  assert(numbersRun === 2)
+
+
 
   // assert(app.querySelector('.strings').innerHTML === '1:')
 
@@ -703,53 +815,12 @@ test('render svg', () => {
   assert(app.querySelector('h2').namespaceURI === 'http://www.w3.org/1999/xhtml')
 })
 
-test('suspend', () => {
-  const store = dynamic({
-    visible: true,
-    text: 'ok',
-    text2: 's'
-  })
-
-  let runs = 0
-  let runs2 = 0
-  const $app = render({
-    inner () {
-      if (store.visible$) {
-        return [
-          {
-            inner () {
-              runs += 1
-              return store.text$
-            }
-          },
-          () => {
-            runs2 += 1
-            return store.text2$
-          }
-        ]
-      }
-    }
-  })
-
-  assert(runs === 1)
-  document.body.appendChild($app)
-  store.text$ = 'oks'
-  assert(runs === 2)
-  document.body.removeChild($app)
-  store.text$ = 'oksi'
-  assert(runs === 3)
-  suspend($app)
-  store.text$ = 'oksis'
-  assert(runs === 3)
-  store.text2$ = 'iks'
-  assert(runs === 3)
-})
-
 function testa (what, fn) {
-  test(what, fn)
+  fn()
 }
 
 function test (what, fn) {
+  return
   try {
     fn()
     console.log('%c+ ' + what, 'color: green')
