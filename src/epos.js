@@ -552,6 +552,7 @@ function renderObject (template, isSvg) {
   if (tag === 'svg') {
     isSvg = true
   }
+  // TODO: process <foreignObject>
   if (isSvg) {
     node = document.createElementNS('http://www.w3.org/2000/svg', tag)
   } else {
