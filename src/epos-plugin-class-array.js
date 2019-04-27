@@ -14,7 +14,7 @@ const classArray = {
     }
   },
 
-  cleanupTemplate () {
+  cleanupTemplate ({ template }) {
     if (template.class) {
       delete template.class
     }
@@ -27,7 +27,7 @@ const classArray = {
 
     Epos.autorun(() => {
       const prevClassList = node[_prevClassList_] || []
-      const nextClassList = [].concat(compute(state.class))
+      const nextClassList = [].concat(typeof state.class === 'function' ? state.class() : state.class)
         .filter(c => c && typeof c === 'string')
         .join(' ')
         .split(/\s+/)

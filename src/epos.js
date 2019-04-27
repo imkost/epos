@@ -50,9 +50,8 @@
 // TODO: dynamic + dynamicGet
 // dynamic(fnThatReturnsObject) // dynamic(object)
 window.Epos = {
-  dynamic,
+  dynamic: createSource,
   autorun,
-  compute,
   computed,
   compound,
 
@@ -124,10 +123,6 @@ const afterRun = new Set()
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-let throwWhenReactivityOutside = true
-
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-
 /**
  * All symbols used by Epos
  */
@@ -136,19 +131,10 @@ const _comps_ = Symbol('comps')
 const _usages_ = Symbol('usages')
 const _source_ = Symbol('source')
 const _splice_ = Symbol('splice')
+const _trusted_ = Symbol('trusted')
 const _children_ = Symbol('children')
 const _isStream_ = Symbol('isStream')
 const _boundaryId_ = Symbol('boundaryId')
-
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-
-function dynamic (any) {
-  if (isObject(any) || isArray(any)) {
-    return createSource(any)
-  }
-
-  return any
-}
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
@@ -207,7 +193,7 @@ function createSourceObject (object, parentChange) {
     Object.defineProperty(source, `${key}$`, {
       configurable: true, // for `delete source['key$']` to work
       get () {
-        if (!curComp && throwWhenReactivityOutside) {
+        if (!curComp && !source[_trusted_]) {
           throw new Error(`Referencing a dynamic field "${key}" without a computational context or function`)
         }
         if (curGet) {
@@ -311,16 +297,11 @@ function createSourceArray (array, parentChange) {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
-function compute (fn) {
-  throwWhenReactivityOutside = false
-  const value = isFunction(fn) ? fn() : fn
-  throwWhenReactivityOutside = true
-  return value
-}
-
-/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-
 function computed (fn) {
+  if (!isFunction(fn)) {
+    return fn
+  }
+
   // If `computed` was never run for the given function
   if (!fn[_source_]) {
     // Создаем счетчик использований, который говорит сколько раз computed
@@ -331,6 +312,7 @@ function computed (fn) {
     fn[_source_] = createSource({
       value: void 0
     })
+    fn[_source_][_trusted_] = true
 
     // Перевычисляем значение в standalone-computation (передаем true в авторан)
     fn[_comp_] = autorun(() => {
@@ -372,8 +354,6 @@ function computed (fn) {
         }
       }
     })
-  } else if (throwWhenReactivityOutside) {
-    throw new Error(`Referencing a computed ${fn.name} without a computational context or function`)
   }
 
   // Возвращаем реактивный get на value, таким образом computation, который
@@ -588,7 +568,7 @@ function renderObject (template, isSvg) {
       node.addEventListener(key.toLowerCase().slice(2), value)
     } else {
       autorun(() => {
-        setAttributeSafe(node, key, compute(value), isSvg)
+        setAttributeSafe(node, key, isFunction(value) ? value() : value, isSvg)
       })
     }
   }
@@ -603,6 +583,7 @@ function renderObject (template, isSvg) {
   for (const plugin of plugins) {
     if (plugin.postprocess) {
       const state = stateByPlugin.get(plugin)
+      // TODO: probably remove `template` from args?
       plugin.postprocess({ state, template, node })
     }
   }
@@ -761,7 +742,7 @@ function renderRaw (string) {
  * Stops all dynamic computations for the given node
  */
 function suspend (node) {
-  if (node[_comps_]) {
+  if (node && node[_comps_]) {
     for (const comp of node[_comps_]) {
       comp.stop()
     }

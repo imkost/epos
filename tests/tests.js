@@ -1,5 +1,6 @@
 // const { render, dynamic, autorun, compound, suspend } = window.Epos
 
+const dynamic = Epos.dynamic
 const testStore = dynamic({
   tests: []
 })
@@ -892,7 +893,7 @@ test('throw when dynamic get not inside formula', () => {
   }
 })
 
-test('throw when computed not inside formula', () => {
+test('don\'t throw when computed not inside formula', () => {
   const store = dynamic({
     number: 10
   })
@@ -901,16 +902,8 @@ test('throw when computed not inside formula', () => {
     return store.number$ > 5
   }
 
-  try {
-    const app = render({
-      inner: computed(isLarge) ? 'visible' : 'hidden'
-    })
-  } catch (err) {
-    assert(err.message.startsWith('Referencing a computed isLarge without'))
-  }
-
   const app = render({
-    inner: () => computed(isLarge) ? 'visible' : 'hidden'
+    inner: computed(isLarge) ? 'visible' : 'hidden'
   })
 })
 

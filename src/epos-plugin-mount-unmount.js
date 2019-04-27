@@ -20,7 +20,7 @@ const mountUnmount = {
     }
   },
 
-  cleanupTemplate () {
+  cleanupTemplate ({ template }) {
     if (template.onMount) {
       delete template.onMount
     }
