@@ -1,5 +1,50 @@
 // const { render, dynamic, autorun, compound, suspend } = window.Epos
 
+const testStore = dynamic({
+  tests: []
+})
+
+document.body.appendChild(render({
+  style: `
+    font-family: sans-serif;
+    font-size: 14px;
+    width: 400px;
+    padding-top: 20px;
+    margin: 0 auto;
+  `,
+  inner: [
+    {
+      style: `
+        margin-bottom: 20px;
+        padding: 20px;
+        border-bottom: 1px solid #ebebeb;
+      `,
+      inner: 'TESTS'
+    },
+    testStore.tests.map$(test => {
+      return {
+        style: `
+          display: flex;
+          margin: 5px;
+        `,
+        inner: [
+          {
+            style: `
+              ${test.isSuccess ? `color: green` : `color: red`};
+              width: 20px;
+              text-align: left;
+            `,
+            inner: test.isSuccess ? `✓` : `✗`
+          },
+          {
+            inner: test.what
+          }
+        ]
+      }
+    })
+  ]
+}))
+
 test('render string', () => {
   const n = render('smth')
   assert(n.textContent === 'smth')
@@ -314,7 +359,7 @@ test('stop autoruns for removed elements', () => {
         if (store.shown$) {
           return {
             href () {
-              // return dynamic(hrefComputed)
+              // return computed(hrefComputed)
               hrefRuns += 1
               return store.href$
             },
@@ -351,7 +396,7 @@ test('stop autoruns for removed elements', () => {
   assert(titleRuns === 1)
 })
 
-test('stop dynamic when no more deps', () => {
+test('stop computed when no more deps', () => {
   const store = dynamic({
     title: 'a',
     shown: true,
@@ -373,14 +418,14 @@ test('stop dynamic when no more deps', () => {
       () => {
         firstRuns += 1
         if (store.shown$) {
-          return dynamic(isBig) ? 'large' : 'small'
+          return computed(isBig) ? 'large' : 'small'
         }
         return '--'
       },
       () => {
         secondRuns += 1
         if (store.shown2$) {
-          return dynamic(isBig) ? 'large' : 'small'
+          return computed(isBig) ? 'large' : 'small'
         }
         return '--'
       }
@@ -437,7 +482,7 @@ test('stop dynamic when no more deps', () => {
   assert(secondRuns === 4)
 })
 
-test('getComputed several times', () => {
+test('computed several times', () => {
   const store = dynamic({
     shown: true,
     number: 5
@@ -460,9 +505,9 @@ test('getComputed several times', () => {
     inner () {
       runs += 1
 
-      if (dynamic(isShown)) {
-        const first = dynamic(isLarge) ? 'l' : 's'
-        const second = dynamic(isLarge) ? 'a' : 'm'
+      if (computed(isShown)) {
+        const first = computed(isLarge) ? 'l' : 's'
+        const second = computed(isLarge) ? 'a' : 'm'
         return first + second
       }
 
@@ -624,10 +669,10 @@ testa('complex', () => {
         })
       }
 
-      Stream([ Stream, Stream, [startNode, [1,2,3], endNode] ])
-      при splice => оставить onSplice
-      Если делается splice, то у элемента нужно все onSplice удалять так же как удаляется autorun
-      возможно вынести эту логику прямо в autorun
+      // Stream([ Stream, Stream, [startNode, [1,2,3], endNode] ])
+      // при splice => оставить onSplice
+      // Если делается splice, то у элемента нужно все onSplice удалять так же как удаляется autorun
+      // возможно вынести эту логику прямо в autorun
 
       // {
       //   inner () {
@@ -816,16 +861,15 @@ test('render svg', () => {
 })
 
 function testa (what, fn) {
-  fn()
+  // fn()
 }
 
 function test (what, fn) {
-  return
   try {
     fn()
-    console.log('%c+ ' + what, 'color: green')
+    log(what, true)
   } catch (err) {
-    console.log(`%c✕ ${what}`, 'color: red')
+    log(what, false)
     console.error(err)
   }
 }
@@ -834,4 +878,11 @@ function assert (condition) {
   if (!condition) {
     throw new Error()
   }
+}
+
+function log (what, isSuccess) {
+  testStore.tests.push$({
+    what,
+    isSuccess
+  })
 }

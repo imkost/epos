@@ -1,8 +1,5 @@
 // TODO: throw exception if dynamic get not inside computation
 // TODO: add middle process for deleting only to prevent plugins conflicts (cleanupTemplate)
-
-// TODO: идея для перформанса
-// вместо того, чтобы делать nextSibling до endBoundary, мы создаем ссылку startBoundary[_endBoundary_]
 //
 // idea: Epos.dynamic(value)
 // var hidden = Epos.dynamic(false)
@@ -205,6 +202,9 @@ function createSourceObject (object, parentChange) {
     Object.defineProperty(source, `${key}$`, {
       configurable: true, // for `delete source['key$']` to work
       get () {
+        if (!curComp) {
+          throw new Error(`Referencing a dynamic field ${key} without a computational context or function`)
+        }
         if (curGet) {
           curGet(change)
         }
@@ -359,7 +359,7 @@ function computed (fn) {
       }
     })
   } else {
-    // TODO: throw error
+    throw new Error(`Referencing a computed ${fn.name} without a computational context or function`)
   }
 
   // Возвращаем реактивный get на value, таким образом computation, который
