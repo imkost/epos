@@ -52,6 +52,7 @@
 window.Epos = {
   dynamic,
   autorun,
+  compute,
   computed,
   compound,
 
@@ -120,6 +121,10 @@ const plugins = []
  * перевычислился. Этот набор нужен для реализации `computed`.
  */
 const afterRun = new Set()
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
+let throwWhenReactivityOutside = true
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
@@ -202,8 +207,8 @@ function createSourceObject (object, parentChange) {
     Object.defineProperty(source, `${key}$`, {
       configurable: true, // for `delete source['key$']` to work
       get () {
-        if (!curComp) {
-          throw new Error(`Referencing a dynamic field ${key} without a computational context or function`)
+        if (!curComp && throwWhenReactivityOutside) {
+          throw new Error(`Referencing a dynamic field "${key}" without a computational context or function`)
         }
         if (curGet) {
           curGet(change)
@@ -224,7 +229,7 @@ function createSourceObject (object, parentChange) {
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
 function createSourceArray (array, parentChange) {
-  const source = array.map(i => createSource(i))
+  const source = array.map(item => createSource(item))
   source[_splice_] = new Set() // fns to be called after splice$
 
   // TODO: add sort$ and reverse$
@@ -306,6 +311,15 @@ function createSourceArray (array, parentChange) {
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
+function compute (fn) {
+  throwWhenReactivityOutside = false
+  const value = isFunction(fn) ? fn() : fn
+  throwWhenReactivityOutside = true
+  return value
+}
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
 function computed (fn) {
   // If `computed` was never run for the given function
   if (!fn[_source_]) {
@@ -358,7 +372,7 @@ function computed (fn) {
         }
       }
     })
-  } else {
+  } else if (throwWhenReactivityOutside) {
     throw new Error(`Referencing a computed ${fn.name} without a computational context or function`)
   }
 
@@ -395,7 +409,7 @@ function createStream (sourceArray, fn) {
     // Трансформируем новые значения
     items = items.map(item => fn(item))
 
-    // Делаем реактивный splice$, что стриггерить слушателей потока, если такие имеются
+    // Делаем реактивный splice$, чтобы стриггерить слушателей потока, если такие имеются
     stream.splice$(start, removeCount, ...items)
   })
 
@@ -574,7 +588,7 @@ function renderObject (template, isSvg) {
       node.addEventListener(key.toLowerCase().slice(2), value)
     } else {
       autorun(() => {
-        setAttributeSafe(node, key, isFunction(value) ? value() : value, isSvg)
+        setAttributeSafe(node, key, compute(value), isSvg)
       })
     }
   }

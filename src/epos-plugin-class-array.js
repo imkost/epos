@@ -27,7 +27,7 @@ const classArray = {
 
     Epos.autorun(() => {
       const prevClassList = node[_prevClassList_] || []
-      const nextClassList = [].concat(typeof state.class === 'function' ? state.class() : state.class)
+      const nextClassList = [].concat(compute(state.class))
         .filter(c => c && typeof c === 'string')
         .join(' ')
         .split(/\s+/)

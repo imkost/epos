@@ -22,6 +22,7 @@ document.body.appendChild(render({
       inner: 'TESTS'
     },
     testStore.tests.map$(test => {
+      const i = () => testStore.tests$.indexOf(test)
       return {
         style: `
           display: flex;
@@ -35,6 +36,19 @@ document.body.appendChild(render({
               text-align: left;
             `,
             inner: test.isSuccess ? `✓` : `✗`
+          },
+          {
+            style: `
+              width: 20px;
+              text-align: right;
+              margin-right: 5px;
+              font-family: Georgia;
+              font-style: italic;
+              color: #888;
+            `,
+            inner () {
+              return computed(i) + 1 + '.'
+            }
           },
           {
             inner: test.what
@@ -858,6 +872,50 @@ test('render svg', () => {
   assert(app.querySelector('circle').namespaceURI === svg)
   assert(app.querySelector('rect').namespaceURI === svg)
   assert(app.querySelector('h2').namespaceURI === 'http://www.w3.org/1999/xhtml')
+})
+
+test('throw when dynamic get not inside formula', () => {
+  const store = dynamic({
+    title: 'haha'
+  })
+
+  try {
+    const app = render({
+      inner: [
+        {
+          inner: store.title$
+        }
+      ]
+    })
+  } catch (err) {
+    assert(err.message.startsWith('Referencing a dynamic field "title"'))
+  }
+})
+
+test('throw when computed not inside formula', () => {
+  const store = dynamic({
+    number: 10
+  })
+
+  function isLarge () {
+    return store.number$ > 5
+  }
+
+  try {
+    const app = render({
+      inner: computed(isLarge) ? 'visible' : 'hidden'
+    })
+  } catch (err) {
+    assert(err.message.startsWith('Referencing a computed isLarge without'))
+  }
+
+  const app = render({
+    inner: () => computed(isLarge) ? 'visible' : 'hidden'
+  })
+})
+
+test('dynamic index', () => {
+  // TODO: implement
 })
 
 function testa (what, fn) {
